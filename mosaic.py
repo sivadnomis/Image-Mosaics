@@ -25,19 +25,23 @@ for f in os.listdir(os.getcwd()):#os.listdir('library'):
 #join 2 images together
 ##################
 images = map(Image.open, ['bronze.jpg', 'hut.jpg'])
+size = 250, 250
+for i in images:
+  i.thumbnail(size, Image.ANTIALIAS)
 widths, heights = zip(*(i.size for i in images))
 
 total_width = sum(widths)
 max_height = max(heights)
 
-new_im = Image.new('RGB', (total_width, max_height))
+mosaic = Image.new('RGB', (total_width, max_height))
 
 x_offset = 0
 for im in images:
-  new_im.paste(im, (x_offset,0))
+  mosaic.paste(im, (x_offset,0))
   x_offset += im.size[0]
 
-new_im.save('test.jpg')
+mosaic.save('test.jpg')
+mosaic.show()
 
 ##################
 #calculate average RGB of source image
