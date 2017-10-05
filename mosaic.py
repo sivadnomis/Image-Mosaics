@@ -17,7 +17,7 @@ TargetImage.show()
 tile_size = 50, 50
 os.chdir(r'library')
 for f in os.listdir(os.getcwd()):#os.listdir('library'):
-    print f
+    #print f
     tile = Image.open(f)
     tile.thumbnail(tile_size, Image.ANTIALIAS)
     #tile.show()
@@ -64,16 +64,22 @@ for im in images:
 ##################
 #calculate average RGB of source image
 ##################
-width, height = TargetImage.size
-print width, "X", height
 
-PixelValues = list(TargetImage.getdata())
-RValues = [x[0] for x in PixelValues]
-GValues = [x[1] for x in PixelValues]
-BValues = [x[2] for x in PixelValues]
+def CalcAverageRGB( image ):
+  width, height = image.size
+  print width, "X", height
 
-AverageRGBValue = ( sum(RValues)/len(RValues), sum(GValues)/len(GValues), sum(BValues)/len(BValues) )
-print AverageRGBValue
+  PixelValues = list(image.getdata())
+  RValues = [x[0] for x in PixelValues]
+  GValues = [x[1] for x in PixelValues]
+  BValues = [x[2] for x in PixelValues]
+
+  AverageRGBValue = ( sum(RValues)/len(RValues), sum(GValues)/len(GValues), sum(BValues)/len(BValues) )
+  print AverageRGBValue
+  return AverageRGBValue
+
+CalcAverageRGB(TargetImage)
 
 cropped_image = TargetImage.crop((0, 0, 50, 50))
 cropped_image.show()
+CalcAverageRGB(cropped_image)
