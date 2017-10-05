@@ -9,7 +9,7 @@ TargetImage = Image.open('monkey.jpg')
 source_size = 500, 500
 #TargetImage = ImageOps.fit(TargetImage, thumbnail_size, Image.ANTIALIAS)
 TargetImage.thumbnail(source_size, Image.ANTIALIAS)
-TargetImage.show()
+#TargetImage.show()
 
 ##################
 #open tile images in library
@@ -78,8 +78,15 @@ def CalcAverageRGB( image ):
   print AverageRGBValue
   return AverageRGBValue
 
-CalcAverageRGB(TargetImage)
+def DivideImageIntoBlocks( image, block_x, block_y ):
+  width, height = image.size
 
-cropped_image = TargetImage.crop((0, 0, 50, 50))
-cropped_image.show()
-CalcAverageRGB(cropped_image)
+  for i in range(0, width, block_x):
+    for j in range(0, height, block_y):
+      print i, j
+      cropped_image = image.crop((i, j, i+block_x, j+block_y))
+      #cropped_image.show()
+      CalcAverageRGB(cropped_image)
+
+CalcAverageRGB(TargetImage)
+DivideImageIntoBlocks(TargetImage, 50, 50)
