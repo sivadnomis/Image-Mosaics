@@ -67,7 +67,7 @@ for im in images:
 
 def CalcAverageRGB( image ):
   width, height = image.size
-  print width, "X", height
+  #print width, "X", height
 
   PixelValues = list(image.getdata())
   RValues = [x[0] for x in PixelValues]
@@ -75,18 +75,27 @@ def CalcAverageRGB( image ):
   BValues = [x[2] for x in PixelValues]
 
   AverageRGBValue = ( sum(RValues)/len(RValues), sum(GValues)/len(GValues), sum(BValues)/len(BValues) )
-  print AverageRGBValue
+  #print AverageRGBValue
   return AverageRGBValue
 
-def DivideImageIntoBlocks( image, block_x, block_y ):
+##################
+#divide source image into blocks for replacement
+##################
+
+def DivideImageIntoBlocks( image, block_x, block_y, output_dict ):
   width, height = image.size
 
   for i in range(0, width, block_x):
     for j in range(0, height, block_y):
-      print i, j
+      #print i, j
       cropped_image = image.crop((i, j, i+block_x, j+block_y))
+      output_dict[cropped_image] = CalcAverageRGB( cropped_image )
       #cropped_image.show()
-      CalcAverageRGB(cropped_image)
+      #CalcAverageRGB(cropped_image)
+
 
 CalcAverageRGB(TargetImage)
-DivideImageIntoBlocks(TargetImage, 50, 50)
+
+block_dict = {}
+DivideImageIntoBlocks(TargetImage, 50, 50, block_dict)
+print block_dict
