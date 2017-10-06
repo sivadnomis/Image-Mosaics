@@ -1,27 +1,32 @@
 from PIL import Image, ImageOps
 import os
 
+TargetImage = Image.open('monkey.jpg')
+tile_size = 50, 50
+
 ##################
 #open source image
 ##################
-def ShowSourceImage():
-  TargetImage = Image.open('monkey.jpg')
+def ResizeSourceImage( image ):
+  
   source_size = 500, 500
   #TargetImage = ImageOps.fit(TargetImage, thumbnail_size, Image.ANTIALIAS)
-  TargetImage.thumbnail(source_size, Image.ANTIALIAS)
-  TargetImage.show()
+  image.thumbnail(source_size, Image.ANTIALIAS)
+  #image.show()
 
 ##################
 #open tile images in library
 ##################
-def ShowLibraryImages():
-  tile_size = 50, 50
+def ResizeLibraryImages(): 
+  images = []
   os.chdir(r'library')
   for f in os.listdir(os.getcwd()):#os.listdir('library'):
       #print f
       tile = Image.open(f)
       tile.thumbnail(tile_size, Image.ANTIALIAS)
-      tile.show()
+      images.append(tile)
+      #tile.show()
+  return images
 
 ##################
 #join 4 images together
@@ -61,7 +66,7 @@ def FourImageMosaic():
     #print tile_index
 
   #mosaic.save('test.jpg')
-  mosaic.show()
+  #mosaic.show()
 
 ##################
 #calculate average RGB of source image
@@ -95,11 +100,19 @@ def DivideImageIntoBlocks( image, block_x, block_y, output_dict ):
 #main method
 ##################
 
-#ShowSourceImage()
-#ShowLibraryImages()
-#FourImageMosaic()
-CalcAverageRGB(TargetImage)
+ResizeSourceImage(TargetImage)
+tiles = {}
+tiles = ResizeLibraryImages()
+FourImageMosaic()
 
-block_dict = {}
-DivideImageIntoBlocks(TargetImage, 50, 50, block_dict)
-#print block_dict
+#TargetImageRGBAverage = CalcAverageRGB(TargetImage)
+#print "Source average RGB: ", TargetImageRGBAverage
+
+TileRGBAverages = {}
+for t in tiles:
+  TileRGBAverages[t] = CalcAverageRGB(t)
+print TileRGBAverages
+
+blockRGB_dict = {}
+DivideImageIntoBlocks(TargetImage, 50, 50, blockRGB_dict)
+#print blockRGB_dict
