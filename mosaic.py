@@ -1,5 +1,6 @@
 from PIL import Image, ImageOps
 import os
+import math
 
 TargetImage = Image.open('monkey.jpg')
 tile_size = 50, 50
@@ -93,7 +94,7 @@ def DivideImageIntoBlocks( image, block_x, block_y, output_dict ):
   for i in range(0, width, block_x):
     for j in range(0, height, block_y):
       cropped_image = image.crop((i, j, i+block_x, j+block_y))
-      output_dict[cropped_image] = CalcAverageRGB( cropped_image )
+      output_dict[CalcAverageRGB( cropped_image )] = cropped_image
       #cropped_image.show()
 
 ##################
@@ -110,9 +111,25 @@ FourImageMosaic()
 
 TileRGBAverages = {}
 for t in tiles:
-  TileRGBAverages[t] = CalcAverageRGB(t)
-print TileRGBAverages
+  TileRGBAverages[CalcAverageRGB(t)] = t
+#print TileRGBAverages
 
 blockRGB_dict = {}
 DivideImageIntoBlocks(TargetImage, 50, 50, blockRGB_dict)
 #print blockRGB_dict
+
+#print "tilergbaverages keys: ", TileRGBAverages.keys()
+#print "tilergbaverages values: ", TileRGBAverages.values()
+#print "blockRGB_dict keys: ", blockRGB_dict.keys()
+
+def distance( x , y ):
+  return math.sqrt((x[0] - y[0])**2 + (x[1] - y[1])**2)
+
+#finds the closest tile colour to the first block of the source image
+first_blocks_tile = min(TileRGBAverages.keys(), key=lambda x:distance(x, blockRGB_dict.keys()[0]))
+print first_blocks_tile
+
+#gives us the tile that best matches the first block in the source image
+print TileRGBAverages.get(first_blocks_tile) 
+#mos_test = Image.open(TileRGBAverages.get(first_blocks_tile))
+#mos_test.show()
