@@ -13,7 +13,7 @@ def ResizeSourceImage( image ):
   source_size = 500, 500
   #TargetImage = ImageOps.fit(TargetImage, thumbnail_size, Image.ANTIALIAS)
   image.thumbnail(source_size, Image.ANTIALIAS)
-  #image.show()
+  image.show()
 
 ##################
 #open tile images in library
@@ -122,6 +122,10 @@ DivideImageIntoBlocks(TargetImage, 50, 50, blockRGB_dict)
 #print "tilergbaverages values: ", TileRGBAverages.values()
 #print "blockRGB_dict keys: ", blockRGB_dict.keys()
 
+
+##################
+#first block colour match test
+##################
 def distance( x , y ):
   return math.sqrt((x[0] - y[0])**2 + (x[1] - y[1])**2)
 
@@ -131,5 +135,38 @@ print first_blocks_tile
 
 #gives us the tile that best matches the first block in the source image
 print TileRGBAverages.get(first_blocks_tile) 
-#mos_test = Image.open(TileRGBAverages.get(first_blocks_tile))
-#mos_test.show()
+#TileRGBAverages.get(first_blocks_tile).show()
+
+##################
+#construct mosaic from tile in library - needs 'functioning'
+##################
+widths, heights = zip(*(i.size for i in blockRGB_dict.values()))
+
+total_width = sum(widths)/2
+total_height = sum(heights)/2
+
+mosaic = Image.new('RGB', (total_width, total_height))
+
+x_offset = 0
+y_offset = 0
+tile_index = 0
+for i in range(0, len(blockRGB_dict.keys()), 1):
+  tile_to_replace_block = min(TileRGBAverages.keys(), key=lambda x:distance(x, blockRGB_dict.keys()[i]))
+
+  mosaic.paste(TileRGBAverages.get(tile_to_replace_block), (x_offset,y_offset))
+  #print "pasted image"
+  #print len(images)/2
+  if tile_index > (len(blockRGB_dict.keys())/2) - 2:
+    tile_index = 0
+    x_offset = 0
+    y_offset += heights[0]
+    #print "x,y offset is: ", x_offset, y_offset
+  else:
+    x_offset += widths[0]
+    tile_index += 1
+    #print "x,y offset is: ", x_offset, y_offset
+  
+  #print tile_index
+
+#mosaic.save('test.jpg')
+mosaic.show()
