@@ -2,8 +2,6 @@ from PIL import Image, ImageOps
 import os
 import math
 
-
-
 ##################
 #open source image
 ##################
@@ -13,6 +11,7 @@ def ResizeSourceImage( image ):
   #TargetImage = ImageOps.fit(TargetImage, thumbnail_size, Image.ANTIALIAS)
   image.thumbnail(source_size, Image.ANTIALIAS)
   image.show()
+  return image
 
 ##################
 #open tile images in library
@@ -89,14 +88,13 @@ def distance( x , y ):
   return math.sqrt((x[0] - y[0])**2 + (x[1] - y[1])**2)
 
 ##################
-#construct mosaic from tiles in library
-
+#main method - construct mosaic from tiles in library
 ##################
 def createMosaic(source_image):
   TargetImage = Image.open(source_image)
   tile_size = 50, 50
 
-  ResizeSourceImage(TargetImage)
+  TargetImage = ResizeSourceImage(TargetImage)
   tiles = {}
   tiles = ResizeLibraryImages(tile_size)
   FourImageMosaic(tile_size)
@@ -104,16 +102,19 @@ def createMosaic(source_image):
   #TargetImageRGBAverage = CalcAverageRGB(TargetImage)
   #print "Source average RGB: ", TargetImageRGBAverage
 
+  #Key = RGB, Value = Image
   TileRGBAverages = {}
   for t in tiles:
     TileRGBAverages[CalcAverageRGB(t)] = t
 
+  #Key = RGB, Value = Image
   blockRGB_dict = {}
   DivideImageIntoBlocks(TargetImage, 50, 50, blockRGB_dict)
 
   #print "tilergbaverages keys: ", TileRGBAverages.keys()
   #print "tilergbaverages values: ", TileRGBAverages.values()
   #print "blockRGB_dict keys: ", blockRGB_dict.keys()
+  #print "blockRGB_dict values: ", blockRGB_dict.values()
 
   #finds the closest tile colour to the first block of the source image
   first_blocks_tile = min(TileRGBAverages.keys(), key=lambda x:distance(x, blockRGB_dict.keys()[0]))
@@ -127,8 +128,9 @@ def createMosaic(source_image):
 
   total_width = sum(widths)/2
   total_height = sum(heights)/2
+  print TargetImage.size
 
-  mosaic = Image.new('RGB', (total_width, total_height))
+  mosaic = Image.new('RGB', (TargetImage.size[0], TargetImage.size[1]))
 
   x_offset = 0
   y_offset = 0
