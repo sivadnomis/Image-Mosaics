@@ -57,7 +57,7 @@ def FourImageMosaic(tile_size):
       tile_index += 1
 
   #mosaic.save('test.jpg')
-  #mosaic.show()
+  mosaic.show()
 
 ##################
 #calculate average RGB of source image
@@ -78,11 +78,15 @@ def CalcAverageRGB( image ):
 ##################
 def DivideImageIntoBlocks( image, block_x, block_y, output_dict ):
   width, height = image.size
+  print width
+  print height
 
+  coordinate = 0;
   for i in range(0, width, block_x):
     for j in range(0, height, block_y):
       cropped_image = image.crop((i, j, i+block_x, j+block_y))
-      output_dict[CalcAverageRGB( cropped_image )] = cropped_image
+      output_dict[coordinate] = CalcAverageRGB( cropped_image )
+      coordinate += 1
 
 def distance( x , y ):
   return math.sqrt((x[0] - y[0])**2 + (x[1] - y[1])**2)
@@ -97,17 +101,14 @@ def createMosaic(source_image):
   TargetImage = ResizeSourceImage(TargetImage)
   tiles = {}
   tiles = ResizeLibraryImages(tile_size)
-  FourImageMosaic(tile_size)
-
-  #TargetImageRGBAverage = CalcAverageRGB(TargetImage)
-  #print "Source average RGB: ", TargetImageRGBAverage
+  #FourImageMosaic(tile_size)
 
   #Key = RGB, Value = Image
   TileRGBAverages = {}
   for t in tiles:
     TileRGBAverages[CalcAverageRGB(t)] = t
 
-  #Key = RGB, Value = Image
+  #Key = coordinate, Value = rgb
   blockRGB_dict = {}
   DivideImageIntoBlocks(TargetImage, 50, 50, blockRGB_dict)
 
@@ -117,36 +118,30 @@ def createMosaic(source_image):
   #print "blockRGB_dict values: ", blockRGB_dict.values()
 
   #finds the closest tile colour to the first block of the source image
-  first_blocks_tile = min(TileRGBAverages.keys(), key=lambda x:distance(x, blockRGB_dict.keys()[0]))
+  first_blocks_tile = min(TileRGBAverages.keys(), key=lambda x:distance(x, blockRGB_dict.values()[0]))
   print (first_blocks_tile)
 
   #gives us the tile that best matches the first block in the source image
-  print (TileRGBAverages.get(first_blocks_tile)) 
-  #TileRGBAverages.get(first_blocks_tile).show()
 
-  widths, heights = zip(*(i.size for i in blockRGB_dict.values()))
+  widths, heights = zip(*(i.size for i in TileRGBAverages.values()))
 
-  total_width = sum(widths)/2
-  total_height = sum(heights)/2
   print TargetImage.size
-
-  mosaic = Image.new('RGB', (TargetImage.size[0], TargetImage.size[1]))
+  mosaic = Image.new('RGB', (TargetImage.size[0]+100, TargetImage.size[1]+100))
 
   x_offset = 0
   y_offset = 0
-  tile_index = 0
-  for i in range(0, len(blockRGB_dict.keys()), 1):
-    tile_to_replace_block = min(TileRGBAverages.keys(), key=lambda x:distance(x, blockRGB_dict.keys()[i]))
 
+  for i in range(0, len(blockRGB_dict.keys()), 1):
+    #find closest colour tile in library to this specific block
+    tile_to_replace_block = min(TileRGBAverages.keys(), key=lambda x:distance(x, blockRGB_dict.values()[i]))
     mosaic.paste(TileRGBAverages.get(tile_to_replace_block), (x_offset,y_offset))
 
-    if tile_index > (len(blockRGB_dict.keys())/2) - 2:
-      tile_index = 0
-      x_offset = 0
-      y_offset += heights[0]
+    #sets the point to place the next tile
+    if y_offset < 450:
+      y_offset += 50#heights[0]
     else:
-      x_offset += widths[0]
-      tile_index += 1
+      y_offset = 0
+      x_offset += 50#widths[0]
 
   #mosaic.save('test.jpg')
   mosaic.show()
