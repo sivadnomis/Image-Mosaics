@@ -10,6 +10,7 @@ def ResizeSourceImage( image ):
   source_size = 500, 500
   #TargetImage = ImageOps.fit(TargetImage, thumbnail_size, Image.ANTIALIAS)
   image.thumbnail(source_size, Image.ANTIALIAS)
+  print image.size
   image.show()
   return image
 
@@ -76,17 +77,19 @@ def CalcAverageRGB( image ):
 ##################
 #divide source image into blocks for replacement
 ##################
-def DivideImageIntoBlocks( image, block_x, block_y, output_dict ):
+def DivideImageIntoBlocks( image, tile_size, output_dict ):
   width, height = image.size
-  print width
-  print height
+  #print "width: ", width
+  #print "height", height
 
   coordinate = 0;
-  for i in range(0, width, block_x):
-    for j in range(0, height, block_y):
-      cropped_image = image.crop((i, j, i+block_x, j+block_y))
+  for i in range(0, width, tile_size[0]):
+    for j in range(0, height, tile_size[1]):
+      cropped_image = image.crop((i, j, i+tile_size[0], j+tile_size[1]))
       output_dict[coordinate] = CalcAverageRGB( cropped_image )
       coordinate += 1
+
+  return ((i,j))
 
 def distance( x , y ):
   return math.sqrt((x[0] - y[0])**2 + (x[1] - y[1])**2)
@@ -110,7 +113,7 @@ def createMosaic(source_image):
 
   #Key = coordinate, Value = rgb
   blockRGB_dict = {}
-  DivideImageIntoBlocks(TargetImage, 50, 50, blockRGB_dict)
+  CroppedImageXY = DivideImageIntoBlocks(TargetImage, tile_size, blockRGB_dict)
 
   #print "tilergbaverages keys: ", TileRGBAverages.keys()
   #print "tilergbaverages values: ", TileRGBAverages.values()
@@ -119,14 +122,14 @@ def createMosaic(source_image):
 
   #finds the closest tile colour to the first block of the source image
   first_blocks_tile = min(TileRGBAverages.keys(), key=lambda x:distance(x, blockRGB_dict.values()[0]))
-  print (first_blocks_tile)
+  #print (first_blocks_tile)
 
   #gives us the tile that best matches the first block in the source image
 
   widths, heights = zip(*(i.size for i in TileRGBAverages.values()))
 
-  print TargetImage.size
-  mosaic = Image.new('RGB', (TargetImage.size[0]+100, TargetImage.size[1]+100))
+  #print TargetImage.size
+  mosaic = Image.new('RGB', (TargetImage.size[0], TargetImage.size[1]))
 
   x_offset = 0
   y_offset = 0
@@ -135,9 +138,9 @@ def createMosaic(source_image):
     #find closest colour tile in library to this specific block
     tile_to_replace_block = min(TileRGBAverages.keys(), key=lambda x:distance(x, blockRGB_dict.values()[i]))
     mosaic.paste(TileRGBAverages.get(tile_to_replace_block), (x_offset,y_offset))
-
+    
     #sets the point to place the next tile
-    if y_offset < 450:
+    if y_offset < CroppedImageXY[1]:
       y_offset += 50#heights[0]
     else:
       y_offset = 0
