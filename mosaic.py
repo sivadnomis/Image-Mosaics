@@ -97,9 +97,10 @@ def distance( x , y ):
 ##################
 #main method - construct mosaic from tiles in library
 ##################
-def createMosaic(source_image):
+def createMosaic(source_image, input_tile_size):
   TargetImage = Image.open(source_image)
-  tile_size = 50, 50
+  tile_size = input_tile_size, input_tile_size
+  print "tile size is : ", tile_size
 
   TargetImage = ResizeSourceImage(TargetImage)
   tiles = {}
@@ -138,13 +139,13 @@ def createMosaic(source_image):
     #find closest colour tile in library to this specific block
     tile_to_replace_block = min(TileRGBAverages.keys(), key=lambda x:distance(x, blockRGB_dict.values()[i]))
     mosaic.paste(TileRGBAverages.get(tile_to_replace_block), (x_offset,y_offset))
-    
+
     #sets the point to place the next tile
     if y_offset < CroppedImageXY[1]:
-      y_offset += 50#heights[0]
+      y_offset += tile_size[1]#heights[0]
     else:
       y_offset = 0
-      x_offset += 50#widths[0]
+      x_offset += tile_size[0]#widths[0]
 
   #mosaic.save('test.jpg')
   mosaic.show()
