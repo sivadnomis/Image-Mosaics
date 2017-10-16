@@ -147,5 +147,6 @@ def createMosaic(source_image, input_tile_size):
       y_offset = 0
       x_offset += tile_size[0]#widths[0]
 
-  #mosaic.save('test.jpg')
+  os.path.splitext(source_image)[0]
+  mosaic.save('/home/mbax4sd2/3rd Year Project/output/%s%smosaic.jpg' % (os.path.splitext(source_image)[0], input_tile_size)) 
   mosaic.show()
