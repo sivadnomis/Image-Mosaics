@@ -5,8 +5,8 @@ import math
 ##################
 #open source image
 ##################
-def resize_source_image( image ):
-  
+def resize_source_image( image ):  
+  #default dimensions to resize source image to
   source_size = 500, 500
   #target_image = ImageOps.fit(target_image, thumbnail_size, Image.ANTIALIAS)
   image.thumbnail(source_size, Image.ANTIALIAS)
@@ -87,12 +87,7 @@ def create_mosaic(source_image, input_tile_size):
   #print "block_rgb_dict keys: ", block_rgb_dict.keys()
   #print "block_rgb_dict values: ", block_rgb_dict.values()
 
-  #finds the closest tile colour to the first block of the source image
-  first_blocks_tile = min(tile_rgb_averages.keys(), key=lambda x:distance(x, block_rgb_dict.values()[0]))
-  #print (first_blocks_tile)
-
   #gives us the tile that best matches the first block in the source image
-
   widths, heights = zip(*(i.size for i in tile_rgb_averages.values()))
 
   #print target_image.size
@@ -100,10 +95,13 @@ def create_mosaic(source_image, input_tile_size):
 
   x_offset = 0
   y_offset = 0
+  num_tiles_placed = 0
+  progress_percentage = 0
 
-  for i in range(0, len(block_rgb_dict.keys()), 1):
+  for i in range(0, len(block_rgb_dict.keys()), 1):    
     #find closest colour tile in library to this specific block
     tile_to_replace_block = min(tile_rgb_averages.keys(), key=lambda x:distance(x, block_rgb_dict.values()[i]))
+    #print "source block ", block_rgb_dict.values()[i], " matches ", tile_to_replace_block
     mosaic.paste(tile_rgb_averages.get(tile_to_replace_block), (x_offset,y_offset))
 
     #sets the point to place the next tile
@@ -113,6 +111,16 @@ def create_mosaic(source_image, input_tile_size):
       y_offset = 0
       x_offset += tile_size[0]#widths[0]
 
+    num_tiles_placed += 1
+    progress_percentage = num_tiles_placed/float(len(block_rgb_dict.keys())) * 100
+    if progress_percentage % 1 == 0:
+      print "Progress: ", progress_percentage, "%"
+
   os.path.splitext(source_image)[0]
   mosaic.save('/home/mbax4sd2/3rd Year Project/output/%s%smosaic.jpg' % (os.path.splitext(source_image)[0], input_tile_size)) 
   mosaic.show()
+
+#TODO: percentage progress bar for output
+
+#command for generating a diff on 2 images. good enough for difference testing?
+#compare -metric PSNR mesmall.jpg output/me2mosaic.jpg output/diff.jpg
