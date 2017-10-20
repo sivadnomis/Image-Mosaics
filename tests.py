@@ -1,3 +1,5 @@
+from PIL import Image
+import os
 import mosaic
 import sys
 import commands
@@ -39,8 +41,18 @@ def four_image_mosaic(tile_size):
 #four_image_mosaic(sys.argv[1])
 
 
-filename = 'output/me2mosaic.jpg'
-result = commands.getstatusoutput('compare -metric PSNR mesmall.jpg ' + filename + ' output/diff.jpg')
+mosaic_image = sys.argv[1]
+source_image = sys.argv[2]
+
+source_size = 500, 500
+image = Image.open(source_image)
+image.thumbnail(source_size, Image.ANTIALIAS)
+
+image_name = '%ssmall.jpg' % os.path.splitext(source_image)[0]
+print image_name
+image.save('/home/mbax4sd2/3rd Year Project/' + image_name) 
+
+result = commands.getstatusoutput('compare -metric PSNR ' + mosaic_image + ' ' + image_name + ' output/diff.jpg')
 print result[1]
 
 #command for generating a diff on 2 images. good enough for difference testing?
