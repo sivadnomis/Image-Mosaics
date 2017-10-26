@@ -58,7 +58,10 @@ def divide_image_into_blocks( image, tile_size, output_dict ):
 #get euclidean distance between 2 RGB values
 ##################
 def distance( x , y ):
-  return math.sqrt((x[0] - y[0])**2 + (x[1] - y[1])**2)
+  dist = math.sqrt((x[0] - y[0])**2 + (x[1] - y[1])**2)
+  #if dist > 200:
+    #print dist
+  return dist
 
 ##################
 #main method - construct mosaic from tiles in library
@@ -76,7 +79,7 @@ def create_mosaic(source_image, input_tile_size):
   for t in tiles:
     tile_rgb_averages[calc_average_rgb(t)] = t
 
-  #Key = coordinate, Value = rgb
+  #Key = Coordinate in Source, Value = RGB
   block_rgb_dict = {}
   cropped_image_xy = divide_image_into_blocks(target_image, tile_size, block_rgb_dict)
 
@@ -93,6 +96,12 @@ def create_mosaic(source_image, input_tile_size):
   for i in range(0, len(block_rgb_dict.keys()), 1):    
     #find closest colour tile in library to this specific block
     tile_to_replace_block = min(tile_rgb_averages.keys(), key=lambda x:distance(x, block_rgb_dict.values()[i]))
+
+    #flag up when there isn't a close tile match, indicating we need a better library image
+    #30 is a magic number (~10% matches flagged), how do we determine where that comes from?
+    if distance(tile_to_replace_block, block_rgb_dict.values()[i]) > 30:
+      print 'Distance between block: ', block_rgb_dict.keys()[i], 'and its tile is greater than 30'
+    
     #paste tile into place in output mosaic image
     mosaic.paste(tile_rgb_averages.get(tile_to_replace_block), (x_offset,y_offset))
 
