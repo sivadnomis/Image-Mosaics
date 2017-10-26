@@ -20,7 +20,8 @@ def resize_library_images(tile_size):
   os.chdir(r'library')
   for f in os.listdir(os.getcwd()):
       tile = Image.open(f)
-      tile.thumbnail(tile_size, Image.ANTIALIAS)
+      tile = ImageOps.fit(tile, tile_size, Image.ANTIALIAS)
+      #tile.thumbnail(tile_size, Image.ANTIALIAS)
       images.append(tile)
   return images
 
