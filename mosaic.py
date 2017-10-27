@@ -66,7 +66,7 @@ def distance( x , y ):
 ##################
 #main method - construct mosaic from tiles in library
 ##################
-def create_mosaic(source_image, input_tile_size):
+def create_mosaic(source_image, input_tile_size, outlier_flagging):
   target_image = Image.open(source_image)
   tile_size = input_tile_size, input_tile_size
 
@@ -86,7 +86,7 @@ def create_mosaic(source_image, input_tile_size):
   #gives us the tile that best matches the first block in the source image
   widths, heights = zip(*(i.size for i in tile_rgb_averages.values()))
   #create base mosaic image of default dimensions
-  mosaic = Image.new('RGB', (target_image.size[0], target_image.size[1]))
+  mosaic = Image.new('RGB', (target_image.size[0], target_image.size[1]), color=(255, 0, 255))
 
   x_offset = 0
   y_offset = 0
@@ -98,13 +98,13 @@ def create_mosaic(source_image, input_tile_size):
     tile_to_replace_block = min(tile_rgb_averages.keys(), key=lambda x:distance(x, block_rgb_dict.values()[i]))
 
     #flag up when there isn't a close tile match, indicating we need a better library image
-    #30 is a magic number (~10% matches flagged), how do we determine where that comes from?
-    if distance(tile_to_replace_block, block_rgb_dict.values()[i]) > 30:
-      print 'Distance between block: ', block_rgb_dict.keys()[i], 'and its tile is greater than 30'
-    
-    #paste tile into place in output mosaic image
-    mosaic.paste(tile_rgb_averages.get(tile_to_replace_block), (x_offset,y_offset))
-
+    #50 is a magic number, how do we determine where that comes from?
+    if outlier_flagging & (distance(tile_to_replace_block, block_rgb_dict.values()[i]) > 50):
+      print 'Distance between block: ', block_rgb_dict.keys()[i], 'and its tile is greater than 50'
+    else:
+      #paste tile into place in output mosaic image
+      mosaic.paste(tile_rgb_averages.get(tile_to_replace_block), (x_offset,y_offset))
+      
     #sets the point to place the next tile
     if y_offset < cropped_image_xy[1]:
       y_offset += tile_size[1]
