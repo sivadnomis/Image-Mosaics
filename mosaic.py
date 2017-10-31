@@ -1,4 +1,5 @@
 from PIL import Image, ImageOps
+from random import randint
 import os
 import math
 
@@ -42,7 +43,7 @@ def calc_average_rgb( image ):
 ##################
 #divide source image into blocks for replacement
 ##################
-def divide_image_into_blocks( image, tile_size, output_dict ):
+def divide_image_into_blocks(image, tile_size, output_dict):
   width, height = image.size
 
   coordinate = 0;
@@ -59,14 +60,22 @@ def divide_image_into_blocks( image, tile_size, output_dict ):
 ##################
 def distance( x , y ):
   dist = math.sqrt((x[0] - y[0])**2 + (x[1] - y[1])**2)
-  #if dist > 200:
-    #print dist
   return dist
+
+##################
+#returns closest tile to block
+##################
+def closest_tile(tile_rgb_averages, block_rgb_average, vary_tiles):
+  blah = sorted(tile_rgb_averages, key=lambda x:distance(x, block_rgb_average))
+  if vary_tiles:
+    return blah[randint(0, 1)]
+  else:
+    return blah[0]
 
 ##################
 #main method - construct mosaic from tiles in library
 ##################
-def create_mosaic(source_image, input_tile_size, outlier_flagging):
+def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
   target_image = Image.open(source_image)
   tile_size = input_tile_size, input_tile_size
 
@@ -95,7 +104,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging):
 
   for i in range(0, len(block_rgb_dict.keys()), 1):    
     #find closest colour tile in library to this specific block
-    tile_to_replace_block = min(tile_rgb_averages.keys(), key=lambda x:distance(x, block_rgb_dict.values()[i]))
+    tile_to_replace_block = closest_tile(tile_rgb_averages.keys(), block_rgb_dict.values()[i], vary_tiles)
 
     #flag up when there isn't a close tile match, indicating we need a better library image
     #50 is a magic number, how do we determine where that comes from?
@@ -104,7 +113,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging):
     else:
       #paste tile into place in output mosaic image
       mosaic.paste(tile_rgb_averages.get(tile_to_replace_block), (x_offset,y_offset))
-      
+
     #sets the point to place the next tile
     if y_offset < cropped_image_xy[1]:
       y_offset += tile_size[1]
