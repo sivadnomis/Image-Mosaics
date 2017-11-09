@@ -34,6 +34,8 @@ def calc_average_rgb(image, histogram_average):
 
   PixelValues = list(image.getdata())
 
+  #if an RGB value occurs only once, we consider it an outlier, and do not include in
+  # our calculcation of the mean
   if histogram_average:
     for i in PixelValues:
       if PixelValues.count(i) < 2:

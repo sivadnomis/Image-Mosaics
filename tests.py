@@ -12,7 +12,7 @@ image = Image.open(source_image)
 image.thumbnail(source_size, Image.ANTIALIAS)
 
 image_name = '%ssmall.jpg' % os.path.splitext(source_image)[0]
-print image_name
+#print image_name
 image.save('/home/mbax4sd2/3rd Year Project/' + image_name) 
 
 result = commands.getstatusoutput('compare -metric SSIM ' + mosaic_image + ' ' + image_name + ' output/diff.jpg')
