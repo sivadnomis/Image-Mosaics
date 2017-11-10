@@ -3,3 +3,6 @@ mosaic.pyc
 createallmosaics.pyc
 __pycache__/
 output/diff.jpg
+histogram testing
+find_similar_images.py
+hashtest.py

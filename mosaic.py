@@ -2,6 +2,7 @@ from PIL import Image, ImageOps
 from random import randint
 import os
 import math
+import imagehash
 
 ##################
 #open source image
@@ -27,21 +28,20 @@ def resize_library_images(tile_size):
   return images
 
 ##################
-#calculate average RGB of source image
+#calculate average RGB of image
 ##################
-def calc_average_rgb(image, histogram_average):
+def calc_average_rgb(image, histogram_average, is_block):
   width, height = image.size
-
   PixelValues = list(image.getdata())
 
   #if an RGB value occurs only once, we consider it an outlier, and do not include in
   # our calculcation of the mean
   if histogram_average:
-    for i in PixelValues:
-      if PixelValues.count(i) < 2:
-        #print i, PixelValues.count(i)
-        PixelValues.remove(i)
-    #print len(PixelValues)
+    if is_block:
+      for i in PixelValues:
+        if PixelValues.count(i) < 2:          
+          PixelValues.remove(i)
+      #print len(PixelValues)
 
   RValues = [x[0] for x in PixelValues]
   GValues = [x[1] for x in PixelValues]
@@ -51,16 +51,25 @@ def calc_average_rgb(image, histogram_average):
   return average_rgb_value
 
 ##################
+#calculate hash of image
+##################
+def calc_image_hash(image):
+  hash1 = imagehash.whash(image)
+  #print hash1
+  return hash1
+
+##################
 #divide source image into blocks for replacement
 ##################
-def divide_image_into_blocks(image, tile_size, output_dict, histogram_average):
+def divide_image_into_blocks(image, tile_size, output_rgb_dict, output_hash_dict, histogram_average):
   width, height = image.size
 
   coordinate = 0;
   for i in range(0, width, tile_size[0]):
     for j in range(0, height, tile_size[1]):
       cropped_image = image.crop((i, j, i+tile_size[0], j+tile_size[1]))
-      output_dict[coordinate] = calc_average_rgb( cropped_image, histogram_average )
+      output_rgb_dict[coordinate] = calc_average_rgb(cropped_image, histogram_average, True)
+      output_hash_dict[coordinate] = calc_image_hash(cropped_image)
       coordinate += 1
 
   return ((i,j))
@@ -69,18 +78,35 @@ def divide_image_into_blocks(image, tile_size, output_dict, histogram_average):
 #get euclidean distance between 2 RGB values
 ##################
 def distance( x , y ):
-  dist = math.sqrt((x[0] - y[0])**2 + (x[1] - y[1])**2)
+  dist = math.sqrt((x[0] - y[0])**2 + (x[1] - y[1])**2 + (x[2] - y[2])**2)
   return dist
+
+##################
+#get euclidean distance between 2 RGB values
+##################
+def hash_diff( x , y ):
+  diff = x - y
+  return diff
 
 ##################
 #returns closest tile to block
 ##################
 def closest_tile(tile_rgb_averages, block_rgb_average, vary_tiles):
-  sorted_rgv_values = sorted(tile_rgb_averages, key=lambda x:distance(x, block_rgb_average))
+  sorted_rgb_values = sorted(tile_rgb_averages, key=lambda x:distance(x, block_rgb_average))
   if vary_tiles:
-    return sorted_rgv_values[randint(0, 1)]
+    return sorted_rgb_values[randint(0, 1)]
   else:
-    return sorted_rgv_values[0]
+    return sorted_rgb_values[0]
+
+##################
+#returns closest tile to block based on hash value
+##################
+def closest_tile_hashing(tile_hashes, block_hash, vary_tiles):
+  sorted_rgb_values = sorted(tile_hashes, key=lambda x:hash_diff(x, block_hash))
+  if vary_tiles:
+    return sorted_rgb_values[randint(0, 1)]
+  else:
+    return sorted_rgb_values[0]
 
 ##################
 #main method - construct mosaic from tiles in library
@@ -95,13 +121,20 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, h
 
   #Key = RGB, Value = Image
   tile_rgb_averages = {}
+  #Key = hash, Value = Image
+  tile_hashes = {}
   for t in tiles:
-    tile_rgb_averages[calc_average_rgb(t, histogram_average)] = t
+    tile_rgb_averages[calc_average_rgb(t, histogram_average, False)] = t
+    tile_hashes[calc_image_hash(t)] = t
+  #print tile_hashes
 
   #Key = Coordinate in Source, Value = RGB
   block_rgb_dict = {}
-  cropped_image_xy = divide_image_into_blocks(target_image, tile_size, block_rgb_dict, histogram_average)
-  
+  #Key = Coordinate in Source, Value = hash
+  block_hash_dict = {}
+  cropped_image_xy = divide_image_into_blocks(target_image, tile_size, block_rgb_dict, block_hash_dict, histogram_average)
+  #print block_hash_dict
+
   #create base mosaic image of default dimensions
   mosaic = Image.new('RGB', (target_image.size[0], target_image.size[1]), color=(255, 0, 255))
 
@@ -113,6 +146,9 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, h
   for i in range(0, len(block_rgb_dict.keys()), 1):    
     #find closest colour tile in library to this specific block
     tile_to_replace_block = closest_tile(tile_rgb_averages.keys(), block_rgb_dict.values()[i], vary_tiles)
+    
+    #HASHING CODE
+    #tile_to_replace_block = closest_tile_hashing(tile_hashes.keys(), block_hash_dict.values()[i], vary_tiles)
 
     #flag up when there isn't a close tile match, indicating we need a better library image
     #50 is a magic number, how do we determine where that comes from?
@@ -121,6 +157,9 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, h
     else:
       #paste tile into place in output mosaic image
       mosaic.paste(tile_rgb_averages.get(tile_to_replace_block), (x_offset,y_offset))
+    
+    #HASHING CODE
+    #mosaic.paste(tile_hashes.get(tile_to_replace_block), (x_offset,y_offset))
 
     #sets the point to place the next tile
     if y_offset < cropped_image_xy[1]:
@@ -137,4 +176,3 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, h
   os.path.splitext(source_image)[0]
   mosaic.save('/home/mbax4sd2/3rd Year Project/output/%s%smosaic.jpg' % (os.path.splitext(source_image)[0], input_tile_size)) 
   mosaic.show()
-
