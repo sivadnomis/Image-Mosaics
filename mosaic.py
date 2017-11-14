@@ -2,7 +2,7 @@ from PIL import Image, ImageOps
 from random import randint
 import os
 import math
-import imagehash
+import imagehash, sqlite3
 
 ##################
 #open source image
@@ -121,12 +121,13 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, h
 
   #Key = RGB, Value = Image
   tile_rgb_averages = {}
+  #HASHING CODE
   #Key = hash, Value = Image
-  tile_hashes = {}
+  #tile_hashes = {}
   for t in tiles:
     tile_rgb_averages[calc_average_rgb(t, histogram_average, False)] = t
-    tile_hashes[calc_image_hash(t)] = t
-  #print tile_hashes
+    #HASHING CODE
+    #tile_hashes[calc_image_hash(t)] = t
 
   #Key = Coordinate in Source, Value = RGB
   block_rgb_dict = {}
@@ -142,9 +143,23 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, h
   y_offset = 0
   num_tiles_placed = 0
   progress_percentage = 0
-
+  
+  os.chdir(r'..')
+  print os.getcwd()  
   for i in range(0, len(block_rgb_dict.keys()), 1):    
     #find closest colour tile in library to this specific block
+
+    sqlite_file = 'image_library'
+
+    db = sqlite3.connect(sqlite_file)
+    cursor = db.cursor() 
+
+    cursor.execute("SELECT * FROM tiles")
+    db_tiles = cursor.fetchall()
+
+    db.commit()
+    db.close()
+
     tile_to_replace_block = closest_tile(tile_rgb_averages.keys(), block_rgb_dict.values()[i], vary_tiles)
     
     #HASHING CODE
