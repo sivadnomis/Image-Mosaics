@@ -99,6 +99,20 @@ def closest_tile(tile_rgb_averages, block_rgb_average, vary_tiles):
     return sorted_rgb_values[0]
 
 ##################
+#returns closest tile to block given database images
+##################
+def closest_tile_db(db_tiles, block_rgb_average, vary_tiles):
+  tile_rgb_averages = []
+  for tile in db_tiles:
+    tile_rgb_averages.append((tile[1], tile[2], tile[3]))
+
+  sorted_rgb_values = sorted(tile_rgb_averages, key=lambda x:distance(x, block_rgb_average))
+  if vary_tiles:
+    return sorted_rgb_values[randint(0, 1)]
+  else:
+    return sorted_rgb_values[0]
+  
+##################
 #returns closest tile to block based on hash value
 ##################
 def closest_tile_hashing(tile_hashes, block_hash, vary_tiles):
@@ -114,27 +128,42 @@ def closest_tile_hashing(tile_hashes, block_hash, vary_tiles):
 def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, histogram_average):
   target_image = Image.open(source_image)
   tile_size = input_tile_size, input_tile_size
-
   target_image = resize_source_image(target_image)
-  tiles = {}
-  tiles = resize_library_images(tile_size)
 
-  #Key = RGB, Value = Image
-  tile_rgb_averages = {}
+  sqlite_file = 'image_library'
+
+  db = sqlite3.connect(sqlite_file)
+  cursor = db.cursor() 
+
+  cursor.execute("SELECT * FROM tiles")
+  db_tiles = cursor.fetchall()
+
+  db.commit()
+  db.close()
+
   #HASHING CODE
   #Key = hash, Value = Image
   #tile_hashes = {}
-  for t in tiles:
-    tile_rgb_averages[calc_average_rgb(t, histogram_average, False)] = t
-    #HASHING CODE
-    #tile_hashes[calc_image_hash(t)] = t
+
+  #Key = RGB, Value = Image
+  tile_rgb_averages = {} 
+
+  #resize and put tile images from databse into our rgb/image dictionary
+  print 'Gathering image tiles from library...'
+  for i in range(0, len(db_tiles), 1):
+    t = Image.open('library/'+(db_tiles[i])[0])
+    t = ImageOps.fit(t, tile_size, Image.ANTIALIAS)
+
+    tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])] = t
+
+  #HASHING CODE
+  #tile_hashes[calc_image_hash(t)] =l t
 
   #Key = Coordinate in Source, Value = RGB
   block_rgb_dict = {}
   #Key = Coordinate in Source, Value = hash
   block_hash_dict = {}
   cropped_image_xy = divide_image_into_blocks(target_image, tile_size, block_rgb_dict, block_hash_dict, histogram_average)
-  #print block_hash_dict
 
   #create base mosaic image of default dimensions
   mosaic = Image.new('RGB', (target_image.size[0], target_image.size[1]), color=(255, 0, 255))
@@ -144,37 +173,25 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, h
   num_tiles_placed = 0
   progress_percentage = 0
   
-  os.chdir(r'..')
-  print os.getcwd()  
+  db_tiles_rgb_values = []
+
   for i in range(0, len(block_rgb_dict.keys()), 1):    
     #find closest colour tile in library to this specific block
+    tile_rgb_to_replace_block = closest_tile(tile_rgb_averages.keys(), block_rgb_dict.values()[i], vary_tiles)
 
-    sqlite_file = 'image_library'
-
-    db = sqlite3.connect(sqlite_file)
-    cursor = db.cursor() 
-
-    cursor.execute("SELECT * FROM tiles")
-    db_tiles = cursor.fetchall()
-
-    db.commit()
-    db.close()
-
-    tile_to_replace_block = closest_tile(tile_rgb_averages.keys(), block_rgb_dict.values()[i], vary_tiles)
-    
     #HASHING CODE
-    #tile_to_replace_block = closest_tile_hashing(tile_hashes.keys(), block_hash_dict.values()[i], vary_tiles)
+    #tile_rgb_to_replace_block = closest_tile_hashing(tile_hashes.keys(), block_hash_dict.values()[i], vary_tiles)
 
     #flag up when there isn't a close tile match, indicating we need a better library image
     #50 is a magic number, how do we determine where that comes from?
-    if outlier_flagging & (distance(tile_to_replace_block, block_rgb_dict.values()[i]) > 50):
+    if outlier_flagging & (distance(tile_rgb_to_replace_block, block_rgb_dict.values()[i]) > 50):
       print 'Distance between block: ', block_rgb_dict.keys()[i], 'and its tile is greater than 50'
     else:
       #paste tile into place in output mosaic image
-      mosaic.paste(tile_rgb_averages.get(tile_to_replace_block), (x_offset,y_offset))
+      mosaic.paste(tile_rgb_averages.get(tile_rgb_to_replace_block), (x_offset,y_offset))
     
     #HASHING CODE
-    #mosaic.paste(tile_hashes.get(tile_to_replace_block), (x_offset,y_offset))
+    #mosaic.paste(tile_hashes.get(tile_rgb_to_replace_block), (x_offset,y_offset))
 
     #sets the point to place the next tile
     if y_offset < cropped_image_xy[1]:
