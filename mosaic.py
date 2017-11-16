@@ -2,7 +2,7 @@ from PIL import Image, ImageOps
 from random import randint
 import os
 import math
-import imagehash, sqlite3
+import imagehash, sqlite3, time
 
 ##################
 #open source image
@@ -126,6 +126,8 @@ def closest_tile_hashing(tile_hashes, block_hash, vary_tiles):
 #main method - construct mosaic from tiles in library
 ##################
 def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, histogram_average):
+  start = time.time()
+
   target_image = Image.open(source_image)
   tile_size = input_tile_size, input_tile_size
   target_image = resize_source_image(target_image)
@@ -148,12 +150,10 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, h
   #Key = RGB, Value = Image
   tile_rgb_averages = {} 
 
-  #resize and put tile images from databse into our rgb/image dictionary
+  #put tile images from databse into our rgb/image dictionary
   print 'Gathering image tiles from library...'
   for i in range(0, len(db_tiles), 1):
     t = Image.open('library/'+(db_tiles[i])[0])
-    t = ImageOps.fit(t, tile_size, Image.ANTIALIAS)
-
     tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])] = t
 
   #HASHING CODE
@@ -187,8 +187,11 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, h
     if outlier_flagging & (distance(tile_rgb_to_replace_block, block_rgb_dict.values()[i]) > 50):
       print 'Distance between block: ', block_rgb_dict.keys()[i], 'and its tile is greater than 50'
     else:
-      #paste tile into place in output mosaic image
-      mosaic.paste(tile_rgb_averages.get(tile_rgb_to_replace_block), (x_offset,y_offset))
+      #resize and paste tile into place in output mosaic image
+      if tile_rgb_averages[tile_rgb_to_replace_block].size != tile_size:
+        tile_rgb_averages[tile_rgb_to_replace_block] = ImageOps.fit(tile_rgb_averages.get(tile_rgb_to_replace_block), tile_size, Image.ANTIALIAS)
+      
+      mosaic.paste(tile_rgb_averages[tile_rgb_to_replace_block], (x_offset,y_offset))
     
     #HASHING CODE
     #mosaic.paste(tile_hashes.get(tile_rgb_to_replace_block), (x_offset,y_offset))
@@ -208,3 +211,6 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, h
   os.path.splitext(source_image)[0]
   mosaic.save('/home/mbax4sd2/3rd Year Project/output/%s%smosaic.jpg' % (os.path.splitext(source_image)[0], input_tile_size)) 
   mosaic.show()
+
+  end = time.time()
+  print 'Time elapsed: ', end - start
