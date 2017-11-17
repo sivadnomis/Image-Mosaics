@@ -17,7 +17,7 @@ os.chdir(r'library')
 for f in os.listdir(os.getcwd()):
     tile = Image.open(f)
 
-    tile_RGB = mosaic.calc_average_rgb(tile, False, False)
+    tile_RGB = mosaic.calc_average_rgb(tile, False)
     tile_RValue = tile_RGB[0]
     tile_GValue = tile_RGB[1]
     tile_BValue = tile_RGB[2]

@@ -9,7 +9,7 @@ import imagehash, sqlite3, time
 ##################
 def resize_source_image( image ):  
   #default dimensions to resize source image to
-  source_size = 500, 500
+  source_size = 500,500
   image.thumbnail(source_size, Image.ANTIALIAS)
   image.show()
   return image
@@ -23,25 +23,17 @@ def resize_library_images(tile_size):
   for f in os.listdir(os.getcwd()):
       tile = Image.open(f)
       tile = ImageOps.fit(tile, tile_size, Image.ANTIALIAS)
-      #tile.thumbnail(tile_size, Image.ANTIALIAS)
       images.append(tile)
   return images
 
 ##################
 #calculate average RGB of image
 ##################
-def calc_average_rgb(image, histogram_average, is_block):
-  width, height = image.size
-  PixelValues = list(image.getdata())
+def calc_average_rgb(image, is_block):
+  if not is_block:
+    image = ImageOps.fit(image, (50,50), Image.ANTIALIAS)
 
-  #if an RGB value occurs only once, we consider it an outlier, and do not include in
-  # our calculcation of the mean
-  if histogram_average:
-    if is_block:
-      for i in PixelValues:
-        if PixelValues.count(i) < 2:          
-          PixelValues.remove(i)
-      #print len(PixelValues)
+  PixelValues = list(image.getdata())
 
   RValues = [x[0] for x in PixelValues]
   GValues = [x[1] for x in PixelValues]
@@ -61,14 +53,14 @@ def calc_image_hash(image):
 ##################
 #divide source image into blocks for replacement
 ##################
-def divide_image_into_blocks(image, tile_size, output_rgb_dict, output_hash_dict, histogram_average):
+def divide_image_into_blocks(image, tile_size, output_rgb_dict, output_hash_dict):
   width, height = image.size
 
   coordinate = 0;
   for i in range(0, width, tile_size[0]):
     for j in range(0, height, tile_size[1]):
       cropped_image = image.crop((i, j, i+tile_size[0], j+tile_size[1]))
-      output_rgb_dict[coordinate] = calc_average_rgb(cropped_image, histogram_average, True)
+      output_rgb_dict[coordinate] = calc_average_rgb(cropped_image, True)
       output_hash_dict[coordinate] = calc_image_hash(cropped_image)
       coordinate += 1
 
@@ -125,7 +117,7 @@ def closest_tile_hashing(tile_hashes, block_hash, vary_tiles):
 ##################
 #main method - construct mosaic from tiles in library
 ##################
-def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, histogram_average):
+def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
   start = time.time()
 
   target_image = Image.open(source_image)
@@ -154,6 +146,12 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, h
   print 'Gathering image tiles from library...'
   for i in range(0, len(db_tiles), 1):
     t = Image.open('library/'+(db_tiles[i])[0])
+
+    if ((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3]) in tile_rgb_averages:
+      print 'WARNING: 2 tiles with same RGB average: ', tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])], '+', t
+      tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])].show()
+      t.show()
+
     tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])] = t
 
   #HASHING CODE
@@ -163,7 +161,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, h
   block_rgb_dict = {}
   #Key = Coordinate in Source, Value = hash
   block_hash_dict = {}
-  cropped_image_xy = divide_image_into_blocks(target_image, tile_size, block_rgb_dict, block_hash_dict, histogram_average)
+  cropped_image_xy = divide_image_into_blocks(target_image, tile_size, block_rgb_dict, block_hash_dict)
 
   #create base mosaic image of default dimensions
   mosaic = Image.new('RGB', (target_image.size[0], target_image.size[1]), color=(255, 0, 255))
@@ -175,6 +173,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, h
   
   db_tiles_rgb_values = []
 
+  print 'Creating mosaic...'
   for i in range(0, len(block_rgb_dict.keys()), 1):    
     #find closest colour tile in library to this specific block
     tile_rgb_to_replace_block = closest_tile(tile_rgb_averages.keys(), block_rgb_dict.values()[i], vary_tiles)
