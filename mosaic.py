@@ -174,7 +174,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
   db_tiles_rgb_values = []
 
   print 'Creating mosaic...'
-  for i in range(0, len(block_rgb_dict.keys()), 1):    
+  for i in range(0, len(block_rgb_dict.keys()), 1):
     #find closest colour tile in library to this specific block
     tile_rgb_to_replace_block = closest_tile(tile_rgb_averages.keys(), block_rgb_dict.values()[i], vary_tiles)
 
