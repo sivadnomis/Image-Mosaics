@@ -16,19 +16,19 @@ rainbow_naive_results = []
 
 print 'Naive mosaic SSIM results\n'
 for mosaic in monkey_list:
-  result = commands.getstatusoutput('python tests.py output/' + mosaic + '.jpg monkey.jpg')[1]
+  result = commands.getstatusoutput('python test_image.py output/' + mosaic + '.jpg source_images/monkey.jpg')[1]
   monkey_naive_results.append(float(result))
   print result, mosaic, 'naive'  
 print '\n'
 
 for mosaic in me_list:
-  result = commands.getstatusoutput('python tests.py output/' + mosaic + '.jpg me.jpg')[1]
+  result = commands.getstatusoutput('python test_image.py output/' + mosaic + '.jpg source_images/me.jpg')[1]
   me_naive_results.append(float(result))
   print result, mosaic, 'naive' 
 print '\n'
 
 for mosaic in rainbow_list:
-  result = commands.getstatusoutput('python tests.py output/' + mosaic + '.jpg rainbow.jpg')[1]
+  result = commands.getstatusoutput('python test_image.py output/' + mosaic + '.jpg source_images/rainbow.jpg')[1]
   rainbow_naive_results.append(float(result))
   print result, mosaic, 'naive' 
 print '\n------------------------------------\n'
