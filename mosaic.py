@@ -208,7 +208,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
       print "Progress: ", progress_percentage, "%"
 
   os.path.splitext(source_image)[0]
-  mosaic.save('/home/mbax4sd2/3rd Year Project/output/%s%smosaic.jpg' % (os.path.splitext(source_image)[0], input_tile_size)) 
+  mosaic.save('/home/mbax4sd2/3rd Year Project/output/%s%smosaic.jpg' % (os.path.splitext(source_image)[1], input_tile_size)) 
   mosaic.show()
 
   end = time.time()
