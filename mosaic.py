@@ -11,7 +11,7 @@ def resize_source_image( image ):
   #default dimensions to resize source image to
   source_size = 500,500
   image.thumbnail(source_size, Image.ANTIALIAS)
-  image.show()
+  #image.show()
   return image
 
 ##################
@@ -47,7 +47,6 @@ def calc_average_rgb(image, is_block):
 ##################
 def calc_image_hash(image):
   hash1 = imagehash.whash(image)
-  #print hash1
   return hash1
 
 ##################
@@ -84,36 +83,13 @@ def hash_diff( x , y ):
 #returns closest tile to block
 ##################
 def closest_tile(tile_rgb_averages, block_rgb_average, vary_tiles):
-  sorted_rgb_values = sorted(tile_rgb_averages, key=lambda x:distance(x, block_rgb_average))
+  sorted_rgb_values = sorted(tile_rgb_averages.keys(), key=lambda x:distance(x, block_rgb_average))
+
   if vary_tiles:
     return sorted_rgb_values[randint(0, 1)]
   else:
-    return sorted_rgb_values[0]
-
-##################
-#returns closest tile to block given database images
-##################
-def closest_tile_db(db_tiles, block_rgb_average, vary_tiles):
-  tile_rgb_averages = []
-  for tile in db_tiles:
-    tile_rgb_averages.append((tile[1], tile[2], tile[3]))
-
-  sorted_rgb_values = sorted(tile_rgb_averages, key=lambda x:distance(x, block_rgb_average))
-  if vary_tiles:
-    return sorted_rgb_values[randint(0, 1)]
-  else:
-    return sorted_rgb_values[0]
+    return sorted_rgb_values[:2] #experiment with 3 closest rgb matches
   
-##################
-#returns closest tile to block based on hash value
-##################
-def closest_tile_hashing(tile_hashes, block_hash, vary_tiles):
-  sorted_rgb_values = sorted(tile_hashes, key=lambda x:hash_diff(x, block_hash))
-  if vary_tiles:
-    return sorted_rgb_values[randint(0, 1)]
-  else:
-    return sorted_rgb_values[0]
-
 ##################
 #main method - construct mosaic from tiles in library
 ##################
@@ -135,9 +111,8 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
   db.commit()
   db.close()
 
-  #HASHING CODE
   #Key = hash, Value = Image
-  #tile_hashes = {}
+  tile_hashes = {}
 
   #Key = RGB, Value = Image
   tile_rgb_averages = {} 
@@ -154,13 +129,12 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
 
     tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])] = t
 
-  #HASHING CODE
-  #tile_hashes[calc_image_hash(t)] =l t
-
   #Key = Coordinate in Source, Value = RGB
   block_rgb_dict = {}
   #Key = Coordinate in Source, Value = hash
   block_hash_dict = {}
+
+  #divide source image into blocks
   cropped_image_xy = divide_image_into_blocks(target_image, tile_size, block_rgb_dict, block_hash_dict)
 
   #create base mosaic image of default dimensions
@@ -175,25 +149,30 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
 
   print 'Creating mosaic...'
   for i in range(0, len(block_rgb_dict.keys()), 1):
-    #find closest colour tile in library to this specific block
-    tile_rgb_to_replace_block = closest_tile(tile_rgb_averages.keys(), block_rgb_dict.values()[i], vary_tiles)
+    #find closest colour tiles in library to this specific block
+    closest_rgb_matches = closest_tile(tile_rgb_averages, block_rgb_dict.values()[i], vary_tiles)
 
-    #HASHING CODE
-    #tile_rgb_to_replace_block = closest_tile_hashing(tile_hashes.keys(), block_hash_dict.values()[i], vary_tiles)
+    #perform wavelet analysis on the matches to pick the best
+    closest_hashes = {}
+    for rgb in closest_rgb_matches:
+      closest_hashes[calc_image_hash(tile_rgb_averages[rgb])] = rgb
+    hash_diffs = {}
+    for h in closest_hashes.keys():
+      hash_diffs[h - block_hash_dict.values()[i]] = h
+
+    final_hash = hash_diffs[min(hash_diffs)]
+    final_rgb = closest_hashes[final_hash]
 
     #flag up when there isn't a close tile match, indicating we need a better library image
     #50 is a magic number, how do we determine where that comes from?
-    if outlier_flagging & (distance(tile_rgb_to_replace_block, block_rgb_dict.values()[i]) > 50):
+    if outlier_flagging & (distance(final_rgb, block_rgb_dict.values()[i]) > 50):
       print 'Distance between block: ', block_rgb_dict.keys()[i], 'and its tile is greater than 50'
     else:
       #resize and paste tile into place in output mosaic image
-      if tile_rgb_averages[tile_rgb_to_replace_block].size != tile_size:
-        tile_rgb_averages[tile_rgb_to_replace_block] = ImageOps.fit(tile_rgb_averages.get(tile_rgb_to_replace_block), tile_size, Image.ANTIALIAS)
+      if tile_rgb_averages[final_rgb].size != tile_size:
+        tile_rgb_averages[final_rgb] = ImageOps.fit(tile_rgb_averages.get(final_rgb), tile_size, Image.ANTIALIAS)
       
-      mosaic.paste(tile_rgb_averages[tile_rgb_to_replace_block], (x_offset,y_offset))
-    
-    #HASHING CODE
-    #mosaic.paste(tile_hashes.get(tile_rgb_to_replace_block), (x_offset,y_offset))
+      mosaic.paste(tile_rgb_averages[final_rgb], (x_offset,y_offset))
 
     #sets the point to place the next tile
     if y_offset < cropped_image_xy[1]:
@@ -208,8 +187,8 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
       print "Progress: ", progress_percentage, "%"
 
   os.path.splitext(source_image)[0]
-  mosaic.save('/home/mbax4sd2/3rd Year Project/output/%s%smosaic.jpg' % (os.path.splitext(source_image)[1], input_tile_size)) 
-  mosaic.show()
+  mosaic.save('/home/mbax4sd2/3rd Year Project/output/%s%smosaic.jpg' % (os.path.splitext(source_image)[0][14:], input_tile_size)) 
+  #mosaic.show()
 
   end = time.time()
   print 'Time elapsed: ', end - start
