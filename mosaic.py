@@ -11,7 +11,7 @@ def resize_source_image( image ):
   #default dimensions to resize source image to
   source_size = 500,500
   image.thumbnail(source_size, Image.ANTIALIAS)
-  #image.show()
+  image.show()
   return image
 
 ##################
@@ -46,6 +46,7 @@ def calc_average_rgb(image, is_block):
 #calculate hash of image
 ##################
 def calc_image_hash(image):
+  #image = ImageOps.fit(image, (50,50), Image.ANTIALIAS)
   hash1 = imagehash.whash(image)
   return hash1
 
@@ -88,7 +89,7 @@ def closest_tile(tile_rgb_averages, block_rgb_average, vary_tiles):
   if vary_tiles:
     return sorted_rgb_values[randint(0, 1)]
   else:
-    return sorted_rgb_values[:2] #experiment with 3 closest rgb matches
+    return sorted_rgb_values[:3] #experiment with 3 closest rgb matches
   
 ##################
 #main method - construct mosaic from tiles in library
@@ -117,6 +118,9 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
   #Key = RGB, Value = Image
   tile_rgb_averages = {} 
 
+  R_overflow = 256
+  G_overflow = 256
+  B_overflow = 256
   #put tile images from databse into our rgb/image dictionary
   print 'Gathering image tiles from library...'
   for i in range(0, len(db_tiles), 1):
@@ -126,8 +130,12 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
       print 'WARNING: 2 tiles with same RGB average: ', tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])], '+', t
       tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])].show()
       t.show()
-
-    tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])] = t
+      tile_rgb_averages[(R_overflow, G_overflow, B_overflow)] = t
+      R_overflow+=1
+      G_overflow+=1
+      B_overflow+=1
+    else:
+      tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])] = t
 
   #Key = Coordinate in Source, Value = RGB
   block_rgb_dict = {}
@@ -188,7 +196,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
 
   os.path.splitext(source_image)[0]
   mosaic.save('/home/mbax4sd2/3rd Year Project/output/%s%smosaic.jpg' % (os.path.splitext(source_image)[0][14:], input_tile_size)) 
-  #mosaic.show()
+  mosaic.show()
 
   end = time.time()
   print 'Time elapsed: ', end - start
