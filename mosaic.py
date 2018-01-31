@@ -1,4 +1,4 @@
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageFilter, ImageChops
 from random import randint
 import os
 import math
@@ -9,9 +9,9 @@ import imagehash, sqlite3, time
 ##################
 def resize_source_image( image ):  
   #default dimensions to resize source image to
-  source_size = 500,500
+  source_size = 2000, 2000
   image.thumbnail(source_size, Image.ANTIALIAS)
-  image.show()
+  #image.show()
   return image
 
 ##################
@@ -23,6 +23,7 @@ def resize_library_images(tile_size):
   for f in os.listdir(os.getcwd()):
       tile = Image.open(f)
       tile = ImageOps.fit(tile, tile_size, Image.ANTIALIAS)
+      tile = tile.filter(ImageFilter.BLUR)
       images.append(tile)
   return images
 
@@ -53,13 +54,14 @@ def calc_image_hash(image):
 ##################
 #divide source image into blocks for replacement
 ##################
-def divide_image_into_blocks(image, tile_size, output_rgb_dict, output_hash_dict):
+def divide_image_into_blocks(image, tile_size, output_rgb_dict, output_hash_dict, blocks_list):
   width, height = image.size
 
   coordinate = 0;
   for i in range(0, width, tile_size[0]):
     for j in range(0, height, tile_size[1]):
       cropped_image = image.crop((i, j, i+tile_size[0], j+tile_size[1]))
+      blocks_list.append(cropped_image)
       output_rgb_dict[coordinate] = calc_average_rgb(cropped_image, True)
       output_hash_dict[coordinate] = calc_image_hash(cropped_image)
       coordinate += 1
@@ -142,8 +144,9 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
   #Key = Coordinate in Source, Value = hash
   block_hash_dict = {}
 
+  blocks_list = []
   #divide source image into blocks
-  cropped_image_xy = divide_image_into_blocks(target_image, tile_size, block_rgb_dict, block_hash_dict)
+  cropped_image_xy = divide_image_into_blocks(target_image, tile_size, block_rgb_dict, block_hash_dict, blocks_list)
 
   #create base mosaic image of default dimensions
   mosaic = Image.new('RGB', (target_image.size[0], target_image.size[1]), color=(255, 0, 255))
@@ -155,6 +158,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
   
   db_tiles_rgb_values = []
 
+  block_list_counter = 0
   print 'Creating mosaic...'
   for i in range(0, len(block_rgb_dict.keys()), 1):
     #find closest colour tiles in library to this specific block
@@ -180,6 +184,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
       if tile_rgb_averages[final_rgb].size != tile_size:
         tile_rgb_averages[final_rgb] = ImageOps.fit(tile_rgb_averages.get(final_rgb), tile_size, Image.ANTIALIAS)
       
+      #tile_rgb_averages[final_rgb] = ImageChops.screen(tile_rgb_averages[final_rgb], blocks_list[block_list_counter])
       mosaic.paste(tile_rgb_averages[final_rgb], (x_offset,y_offset))
 
     #sets the point to place the next tile
@@ -194,9 +199,13 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
     if progress_percentage % 5 == 0:
       print "Progress: ", progress_percentage, "%"
 
+    block_list_counter += 1
+
+  #mosaic = mosaic.filter(ImageFilter.MedianFilter)
+
   os.path.splitext(source_image)[0]
   mosaic.save('/home/mbax4sd2/3rd Year Project/output/%s%smosaic.jpg' % (os.path.splitext(source_image)[0][14:], input_tile_size)) 
-  mosaic.show()
+  #mosaic.show()
 
   end = time.time()
   print 'Time elapsed: ', end - start
