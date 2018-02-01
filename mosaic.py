@@ -9,9 +9,9 @@ import imagehash, sqlite3, time
 ##################
 def resize_source_image( image ):  
   #default dimensions to resize source image to
-  source_size = 2000, 2000
+  source_size = 1000,1000
   image.thumbnail(source_size, Image.ANTIALIAS)
-  #image.show()
+  image.show()
   return image
 
 ##################
@@ -184,8 +184,21 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
       if tile_rgb_averages[final_rgb].size != tile_size:
         tile_rgb_averages[final_rgb] = ImageOps.fit(tile_rgb_averages.get(final_rgb), tile_size, Image.ANTIALIAS)
       
-      #tile_rgb_averages[final_rgb] = ImageChops.screen(tile_rgb_averages[final_rgb], blocks_list[block_list_counter])
-      mosaic.paste(tile_rgb_averages[final_rgb], (x_offset,y_offset))
+      final_tile = tile_rgb_averages[final_rgb]
+
+      #AVERAGE RGB MASK
+      block_solid_rgb = Image.new('RGB',final_tile.size,block_rgb_dict.values()[i])
+      mask = Image.new('RGBA',final_tile.size,(0,0,0,123))
+      final_tile = Image.composite(final_tile,block_solid_rgb,mask).convert('RGB')
+
+      #ORIGINAL IMAGE MASK
+      #try:
+        #final_tile = ImageChops.screen(final_tile, blocks_list[block_list_counter])
+      #except ValueError:
+        #print 'tile is of erroneous format'
+        #final_tile.show()
+
+      mosaic.paste(final_tile, (x_offset,y_offset))
 
     #sets the point to place the next tile
     if y_offset < cropped_image_xy[1]:
@@ -205,7 +218,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
 
   os.path.splitext(source_image)[0]
   mosaic.save('/home/mbax4sd2/3rd Year Project/output/%s%smosaic.jpg' % (os.path.splitext(source_image)[0][14:], input_tile_size)) 
-  #mosaic.show()
+  mosaic.show()
 
   end = time.time()
   print 'Time elapsed: ', end - start
