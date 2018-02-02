@@ -22,6 +22,8 @@ Main script as command line tool:
 
   [flag]       Highlights blocks in the output mosaic without a close colour match in the library
   [vary]       Selects randomly from the 2 closest tile matches rather than the closest
+  [cheat]      Applies a solid colour mask of the average RGB block over each tile
+  [supercheat] Applies a mask of the source image over the mosaic
 
   Outputs a mosaic of the provided source image in the format output/[input][tile_size]mosaic.jpg
 

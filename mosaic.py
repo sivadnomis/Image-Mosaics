@@ -96,7 +96,7 @@ def closest_tile(tile_rgb_averages, block_rgb_average, vary_tiles):
 ##################
 #main method - construct mosaic from tiles in library
 ##################
-def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
+def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, cheat, super_cheat):
   start = time.time()
 
   target_image = Image.open(source_image)
@@ -186,17 +186,10 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
       
       final_tile = tile_rgb_averages[final_rgb]
 
-      #AVERAGE RGB MASK
-      block_solid_rgb = Image.new('RGB',final_tile.size,block_rgb_dict.values()[i])
-      mask = Image.new('RGBA',final_tile.size,(0,0,0,123))
-      final_tile = Image.composite(final_tile,block_solid_rgb,mask).convert('RGB')
-
-      #ORIGINAL IMAGE MASK
-      #try:
-        #final_tile = ImageChops.screen(final_tile, blocks_list[block_list_counter])
-      #except ValueError:
-        #print 'tile is of erroneous format'
-        #final_tile.show()
+      if cheat:
+        block_solid_rgb = Image.new('RGB',final_tile.size,block_rgb_dict.values()[i])
+        mask = Image.new('RGBA',final_tile.size,(0,0,0,123))
+        final_tile = Image.composite(final_tile,block_solid_rgb,mask).convert('RGB')
 
       mosaic.paste(final_tile, (x_offset,y_offset))
 
@@ -215,6 +208,10 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles):
     block_list_counter += 1
 
   #mosaic = mosaic.filter(ImageFilter.MedianFilter)
+
+  if super_cheat:
+    mask = target_image
+    mosaic = ImageChops.screen(mosaic, mask)
 
   os.path.splitext(source_image)[0]
   mosaic.save('/home/mbax4sd2/3rd Year Project/output/%s%smosaic.jpg' % (os.path.splitext(source_image)[0][14:], input_tile_size)) 
