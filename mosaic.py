@@ -9,7 +9,7 @@ import imagehash, sqlite3, time
 ##################
 def resize_source_image( image ):  
   #default dimensions to resize source image to
-  source_size = 1000,1000
+  source_size = 3000,3000
   image.thumbnail(source_size, Image.ANTIALIAS)
   image.show()
   return image
@@ -130,9 +130,9 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
 
     if ((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3]) in tile_rgb_averages:
       print 'WARNING: 2 tiles with same RGB average: ', tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])], '+', t
-      tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])].show()
-      t.show()
-      tile_rgb_averages[(R_overflow, G_overflow, B_overflow)] = t
+      #tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])].show()
+      #t.show()
+      #tile_rgb_averages[(R_overflow, G_overflow, B_overflow)] = t
       R_overflow+=1
       G_overflow+=1
       B_overflow+=1
@@ -188,8 +188,9 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
 
       if cheat:
         block_solid_rgb = Image.new('RGB',final_tile.size,block_rgb_dict.values()[i])
-        mask = Image.new('RGBA',final_tile.size,(0,0,0,123))
+        mask = Image.new('RGBA',final_tile.size,(0,0,0,95)) #lower is more cheaty
         final_tile = Image.composite(final_tile,block_solid_rgb,mask).convert('RGB')
+        #final_tile = ImageChops.blend(final_tile, block_solid_rgb, 0.5)
 
       mosaic.paste(final_tile, (x_offset,y_offset))
 
@@ -211,7 +212,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
 
   if super_cheat:
     mask = target_image
-    mosaic = ImageChops.screen(mosaic, mask)
+    mosaic = ImageChops.blend(mosaic, mask, 0.5)
 
   os.path.splitext(source_image)[0]
   mosaic.save('/home/mbax4sd2/3rd Year Project/output/%s%smosaic.jpg' % (os.path.splitext(source_image)[0][14:], input_tile_size)) 
