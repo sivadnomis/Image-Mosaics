@@ -7,5 +7,6 @@ histogram testing
 find_similar_images.py
 hashtest.py
 hashing tests
-output/
 librarycol/
+testlib/
+testlib results/

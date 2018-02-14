@@ -1,72 +1,114 @@
-from PIL import Image
+from PIL import Image, ImageOps
 import numpy as np
-import math, sys
+import math, sys, os
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.collections import PolyCollection
 from matplotlib import colors as mcolors
 
-image_name = sys.argv[1]
-image = Image.open(image_name)
+RValues = []
+GValues = []
+BValues = []
 
-PixelValues = list(image.getdata())
+R_Bins = np.linspace(math.ceil(0), math.floor(255), 50);
+G_Bins = np.linspace(math.ceil(0), math.floor(255), 50);
+B_Bins = np.linspace(math.ceil(0), math.floor(255), 50);
 
-RValues = [x[0] for x in PixelValues] #list of all 'r' pixel values in image
-GValues = [x[1] for x in PixelValues]
-BValues = [x[2] for x in PixelValues]
+def generate_RGB_buckets(image):
+  image = ImageOps.fit(image, (50,50), Image.ANTIALIAS)
+  #image.show()
 
-#Figure 2
+  PixelValues = list(image.getdata())
 
-R_Bins = np.linspace(math.ceil(min(RValues)), 
-                   math.floor(max(RValues)),
-                   50) # fixed number of bins
+  RValues = [x[0] for x in PixelValues] #list of all 'r' pixel values in image
+  GValues = [x[1] for x in PixelValues]
+  BValues = [x[2] for x in PixelValues]
 
-G_Bins = np.linspace(math.ceil(min(GValues)), 
-                   math.floor(max(GValues)),
-                   50) # fixed number of bins
+  #Figure 2
 
-B_Bins = np.linspace(math.ceil(min(BValues)), 
-                   math.floor(max(BValues)),
-                   50) # fixed number of bins
+  R_Bins = np.linspace(math.ceil(min(RValues)), 
+                     math.floor(max(RValues)),
+                     50) # fixed number of bins
 
+  G_Bins = np.linspace(math.ceil(min(GValues)), 
+                     math.floor(max(GValues)),
+                     50) # fixed number of bins
 
-plt.xlim([min(B_Bins)-5, max(B_Bins)+5])
-plt.hist(BValues, bins=B_Bins, alpha=0.5)
-
-plt.xlim([min(G_Bins)-5, max(G_Bins)+5])
-plt.hist(GValues, bins=G_Bins, alpha=0.5)
-
-plt.xlim([min(R_Bins)-5, max(R_Bins)+5])
-plt.hist(RValues, bins=R_Bins, alpha=0.5)
-print R_Bins
-
-plt.title('Colour distribution in ' + image_name)
-plt.xlabel('Pixel value')
-plt.ylabel('Count')
+  B_Bins = np.linspace(math.ceil(min(BValues)), 
+                     math.floor(max(BValues)),
+                     50) # fixed number of bins
 
 
-#Figure 1
+  plt.xlim([min(B_Bins)-5, max(B_Bins)+5])
+  plt.hist(BValues, bins=B_Bins, alpha=0.5)
 
-RBuckets = [0] * 256
-for i in RValues:
-  RBuckets[i]+=1
+  plt.xlim([min(G_Bins)-5, max(G_Bins)+5])
+  plt.hist(GValues, bins=G_Bins, alpha=0.5)
 
-GBuckets = [0] * 256
-for i in GValues:
-  GBuckets[i]+=1
+  plt.xlim([min(R_Bins)-5, max(R_Bins)+5])
+  plt.hist(RValues, bins=R_Bins, alpha=0.5)
 
-BBuckets = [0] * 256
-for i in BValues:
-  BBuckets[i]+=1
+  plt.title('Colour distribution in image')
+  plt.xlabel('Pixel value')
+  plt.ylabel('Count')
 
-bucket_list = [RBuckets, GBuckets, BBuckets]
 
+  #Figure 1
+
+  RBuckets = [0] * 256
+  for i in RValues:
+    RBuckets[i]+=1
+
+  GBuckets = [0] * 256
+  for i in GValues:
+    GBuckets[i]+=1
+
+  BBuckets = [0] * 256
+  for i in BValues:
+    BBuckets[i]+=1
+
+  bucket_list = [RBuckets, GBuckets, BBuckets]
+  return bucket_list
+
+
+image_name = 'library'
+
+#Logic for image vs library
+if len(sys.argv) >= 3:
+  if sys.argv[2] == 'lib':
+    os.chdir(sys.argv[1])
+    num_images = 0
+
+    #bucket_list = generate_RGB_buckets(Image.open(os.listdir(os.getcwd())[0]))
+    bucket_list = [[0 for x in range(255)] for y in range(3) ]
+
+    for f in os.listdir(os.getcwd()):
+      image = Image.open(f)
+      temp_bucket_list = generate_RGB_buckets(image)
+      for cb in range(3):
+        for b in range(255):
+          bucket_list[cb][b] += temp_bucket_list[cb][b]
+
+      num_images += 1
+      print 'Calculated image #', num_images, 'of', len(os.listdir(os.getcwd()))
+
+    for cb in range(3):
+      for b in range(255):
+        bucket_list[cb][b] /= num_images
+
+else:
+  image_name = sys.argv[1]
+  image = Image.open(image_name)
+
+  bucket_list = generate_RGB_buckets(image)
+
+#Plot graphs
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 
 i = 0
 for c, z in zip(['r', 'g', 'b'], [10, 20, 30]):
-    xs = np.arange(len(RBuckets)) #max for x axis, creates [0,1,2,3,...,255]
+    xs = np.arange(len(bucket_list[0])) #max for x axis, creates [0,1,2,3,...,255]
     ys = bucket_list[i]
     i+=1
 
