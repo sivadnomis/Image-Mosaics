@@ -10,3 +10,5 @@ hashing tests
 librarycol/
 testlib/
 testlib results/
+cv2/
+numpy-1.14.0/

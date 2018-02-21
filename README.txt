@@ -50,9 +50,9 @@ Other scripts:
   Runs suite of SSIM tests, on the 4 mosaics for each of the main test images.
 
 
-  RGBhistogram.py image
+  RGBhistogram.py image/library [lib]
 
-  Genarates 3 histograms showing the RGB colour distribution of the image specified in the argument
+  Genarates 2 histograms showing the RGB colour distribution of the image/library specified in the argument. Use 'lib' flag if argument is a library.
 
 Notes:
   
