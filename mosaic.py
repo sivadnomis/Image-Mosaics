@@ -4,6 +4,19 @@ import os
 import math
 import imagehash, sqlite3, time
 
+class Tree(object):
+    def __init__(self):
+        self.topleft = None
+        self.bottomleft = None
+        self.topright = None        
+        self.bottomright = None
+        self.data = None
+        self.rgb_avg = None
+        self.ID = 0
+
+variance_threshold = 1300
+num_blocks = 0
+
 ##################
 #open source image
 ##################
@@ -61,7 +74,7 @@ def divide_image_into_blocks(image, tile_size, output_rgb_dict, output_hash_dict
   for i in range(0, width, tile_size[0]):
     for j in range(0, height, tile_size[1]):
       cropped_image = image.crop((i, j, i+tile_size[0], j+tile_size[1]))
-      blocks_list.append(cropped_image)
+      #blocks_list.append(cropped_image)
       output_rgb_dict[coordinate] = calc_average_rgb(cropped_image, True)
       output_hash_dict[coordinate] = calc_image_hash(cropped_image)
       coordinate += 1
@@ -87,22 +100,15 @@ def hash_diff( x , y ):
 ##################
 def closest_tile(tile_rgb_averages, block_rgb_average, vary_tiles):
   sorted_rgb_values = sorted(tile_rgb_averages.keys(), key=lambda x:distance(x, block_rgb_average))
-
   if vary_tiles:
     return sorted_rgb_values[randint(0, 1)]
   else:
     return sorted_rgb_values[:3] #experiment with 3 closest rgb matches
-  
-##################
-#main method - construct mosaic from tiles in library
-##################
-def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, cheat, super_cheat):
-  start = time.time()
 
-  target_image = Image.open(source_image)
-  tile_size = input_tile_size, input_tile_size
-  target_image = resize_source_image(target_image)
-
+##################
+#fills the tile library (dictionary) with the images from the library database 
+##################
+def fill_tile_library(tile_dict):
   sqlite_file = 'image_library'
 
   db = sqlite3.connect(sqlite_file)
@@ -114,30 +120,151 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
   db.commit()
   db.close()
 
-  #Key = hash, Value = Image
-  tile_hashes = {}
-
-  #Key = RGB, Value = Image
-  tile_rgb_averages = {} 
-
   R_overflow = 256
   G_overflow = 256
   B_overflow = 256
-  #put tile images from databse into our rgb/image dictionary
+  #put tile images from database into our rgb/image dictionary
   print 'Gathering image tiles from library...'
   for i in range(0, len(db_tiles), 1):
     t = Image.open('library/'+(db_tiles[i])[0])
 
-    if ((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3]) in tile_rgb_averages:
-      print 'WARNING: 2 tiles with same RGB average: ', tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])], '+', t
-      #tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])].show()
+    if ((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3]) in tile_dict:
+      print 'WARNING: 2 tiles with same RGB average: ', tile_dict[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])], '+', t
+      #tile_dict[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])].show()
       #t.show()
-      #tile_rgb_averages[(R_overflow, G_overflow, B_overflow)] = t
+      #tile_dict[(R_overflow, G_overflow, B_overflow)] = t
       R_overflow+=1
       G_overflow+=1
       B_overflow+=1
     else:
-      tile_rgb_averages[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])] = t
+      tile_dict[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])] = t
+
+def divide_image_into_quads(image):
+  width, height = image.size
+  quadlist = []
+
+  if width > 1 and height > 1:
+    for i in range(0, width, (width+1)/2):
+      for j in range(0, height, (height+1)/2):
+        cropped_image = image.crop((i, j, i+(width+1)/2, j+(height+1)/2))
+        quadlist.append(cropped_image)
+  else:
+    print 'Error: Image is size of 1 pixel'
+
+  return quadlist
+
+##################
+#calculates colour variance between 4 image quads
+##################
+def calculate_variance(node, quad_rgb_dict):
+  #divide image into quads
+  quadlist = divide_image_into_quads(node.data)
+  quadlist_averages = []
+
+  #get average rgb for each quad (for variance calculation) & put blocks into dict
+  for i in quadlist:
+    average_rgb = calc_average_rgb(i, True)
+    quadlist_averages.append(average_rgb)
+
+  #get mean rgb for all 4 quads
+  RValues = [x[0] for x in quadlist_averages]
+  GValues = [x[1] for x in quadlist_averages]
+  BValues = [x[2] for x in quadlist_averages]
+
+  average_quad_rgb_value = ( sum(RValues)/len(RValues), sum(GValues)/len(GValues), sum(BValues)/len(BValues) )
+
+  #get distances from quad averages to overall mean
+  quadlist_distances = []
+  for x in quadlist_averages:
+    quadlist_distances.append(distance(x, average_quad_rgb_value))
+
+  #square distances
+  distances_squared = []
+  for y in quadlist_distances:
+    distances_squared.append(y**2)
+
+  #calculate variance for image
+  variance = sum(distances_squared) / len(distances_squared)
+  return variance, quadlist, quadlist_averages, num_blocks
+
+##################
+#recursively divides images into quads based on their colour variance
+##################
+def quadify_image(node, quad_rgb_dict):  
+  variance, quadlist, quadlist_averages, num_blocks = calculate_variance(node, quad_rgb_dict)
+  #print 'Variance: ', variance, '\n', node.data
+  #print 'num_blocks: ', num_blocks
+
+  #if variance is above threshold, quadify again
+  #print node.data.size, '\n'
+  if variance > variance_threshold and node.data.size > (4,4):
+    #node.data.show()
+
+    node.topleft = Tree()
+    node.bottomleft = Tree()
+    node.topright = Tree()
+    node.bottomright = Tree()
+
+    #put the image/rgb average/ID data into the new wuad children
+    #ID: 0,1,2,3 represent tl,bl,tr,bl respectively
+    #extra digits mean an extra division eg. 30 is top right quad of bottom right quad
+    node.topleft.data = quadlist[0]
+    node.topleft.rgb_avg = quadlist_averages[0]
+    node.topleft.ID = int(str(node.ID) + str(0))    
+    print 'New quad created with ID #', node.topleft.ID
+    #put rgb average data into the quad/block dict
+    quad_rgb_dict[node.topleft.ID] = node.topleft.rgb_avg
+
+    node.bottomleft.data = quadlist[1]
+    node.bottomleft.rgb_avg = quadlist_averages[1]
+    node.bottomleft.ID = int(str(node.ID) + str(1))
+    print 'New quad created with ID #', node.bottomleft.ID
+    quad_rgb_dict[node.bottomleft.ID] = node.bottomleft.rgb_avg
+
+    node.topright.data = quadlist[2]
+    node.topright.rgb_avg = quadlist_averages[2]
+    node.topright.ID = int(str(node.ID) + str(2))
+    print 'New quad created with ID #', node.topright.ID
+    quad_rgb_dict[node.topright.ID] = node.topright.rgb_avg
+
+    node.bottomright.data = quadlist[3]
+    node.bottomright.rgb_avg = quadlist_averages[3]
+    node.bottomright.ID = int(str(node.ID) + str(3))
+    print 'New quad created with ID #', node.bottomright.ID
+    quad_rgb_dict[node.bottomright.ID] = node.bottomright.rgb_avg
+
+    global num_blocks
+    num_blocks += 4
+
+    #node.topleft.data.show()
+    #node.bottomleft.data.show()
+    #node.topright.data.show()
+    #node.bottomright.data.show()
+    #print 'quad topleft'
+    quadify_image(node.topleft, quad_rgb_dict)
+    #print 'quad bottomleft'
+    quadify_image(node.bottomleft, quad_rgb_dict)
+    #print 'quad topright'
+    quadify_image(node.topright, quad_rgb_dict)
+    #print 'quad bottomright'
+    quadify_image(node.bottomright, quad_rgb_dict)
+  
+##################
+#main method - construct mosaic from tiles in library
+##################
+def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, cheat, super_cheat, quadtree):
+  start = time.time()
+
+  target_image = Image.open(source_image)
+  tile_size = input_tile_size, input_tile_size
+  target_image = resize_source_image(target_image)  
+
+  #Key = hash, Value = Image
+  #tile_hashes = {}
+
+  #Key = RGB, Value = Image
+  tile_rgb_averages = {}
+  fill_tile_library(tile_rgb_averages)  
 
   #Key = Coordinate in Source, Value = RGB
   block_rgb_dict = {}
@@ -148,6 +275,62 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
   #divide source image into blocks
   cropped_image_xy = divide_image_into_blocks(target_image, tile_size, block_rgb_dict, block_hash_dict, blocks_list)
 
+
+
+  if quadtree:
+    root = Tree()
+    root.data = target_image
+    root.ID = 0
+
+    #Key = quad/bock ID, Value = RGB avg
+    quad_rgb_dict = {}
+
+    quadify_image(root, quad_rgb_dict)
+    
+    print 'There are', num_blocks, 'blocks:'
+    print quad_rgb_dict, '\n'
+
+    node_iterator = root
+    node_parent = None
+
+    while node_iterator.topleft != None:
+      print 'down topleft'
+      print node_iterator.topleft.ID
+      node_iterator.topleft.data.show()
+      node_parent = node_iterator #save node we were just in for back-travel
+      node_iterator = node_iterator.topleft #move one step down into next child
+    print 'up'
+    node_iterator = node_parent
+
+    while node_iterator.bottomleft != None:
+      print 'down bottomleft'
+      print node_iterator.bottomleft.ID
+      node_iterator.bottomleft.data.show()
+      node_parent = node_iterator #save node we were just in for back-travel
+      node_iterator = node_iterator.bottomleft #move one step down into next child
+    print 'up'
+    node_iterator = node_parent
+
+    while node_iterator.topright != None:
+      print 'down topright'
+      print node_iterator.topright.ID
+      node_iterator.topright.data.show()
+      node_parent = node_iterator #save node we were just in for back-travel
+      node_iterator = node_iterator.topright #move one step down into next child
+    print 'up'
+    node_iterator = node_parent
+
+    while node_iterator.bottomright != None:
+      print 'down bottomright'
+      print node_iterator.bottomright.ID
+      node_iterator.bottomright.data.show()
+      node_parent = node_iterator #save node we were just in for back-travel
+      node_iterator = node_iterator.bottomright #move one step down into next child
+    print 'up'
+    node_iterator = node_parent
+
+
+
   #create base mosaic image of default dimensions
   mosaic = Image.new('RGB', (target_image.size[0], target_image.size[1]), color=(255, 0, 255))
 
@@ -156,7 +339,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
   num_tiles_placed = 0
   progress_percentage = 0
   
-  db_tiles_rgb_values = []
+  #db_tiles_rgb_values = []
 
   block_list_counter = 0
   print 'Creating mosaic...'
@@ -220,3 +403,6 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
 
   end = time.time()
   print 'Time elapsed: ', end - start
+
+#fix recursive showing of images, not handling divisions well (not really necessary tbh, more for debugging)
+#change x/y_offset system to account for tile size
