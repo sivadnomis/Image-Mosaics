@@ -24,7 +24,7 @@ def resize_source_image( image ):
   #default dimensions to resize source image to
   source_size = 3000,3000
   image.thumbnail(source_size, Image.ANTIALIAS)
-  image.show()
+  #image.show()
   return image
 
 ##################
@@ -213,25 +213,25 @@ def quadify_image(node, quad_rgb_dict):
     node.topleft.ID = int(str(node.ID) + str(0))    
     print 'New quad created with ID #', node.topleft.ID
     #put rgb average data into the quad/block dict
-    quad_rgb_dict[node.topleft.ID] = node.topleft.rgb_avg
+    quad_rgb_dict[node.topleft.ID] = [node.topleft.rgb_avg, node.topleft.data]
 
     node.bottomleft.data = quadlist[1]
     node.bottomleft.rgb_avg = quadlist_averages[1]
     node.bottomleft.ID = int(str(node.ID) + str(1))
     print 'New quad created with ID #', node.bottomleft.ID
-    quad_rgb_dict[node.bottomleft.ID] = node.bottomleft.rgb_avg
+    quad_rgb_dict[node.bottomleft.ID] = [node.bottomleft.rgb_avg, node.bottomleft.data]
 
     node.topright.data = quadlist[2]
     node.topright.rgb_avg = quadlist_averages[2]
     node.topright.ID = int(str(node.ID) + str(2))
     print 'New quad created with ID #', node.topright.ID
-    quad_rgb_dict[node.topright.ID] = node.topright.rgb_avg
+    quad_rgb_dict[node.topright.ID] = [node.topright.rgb_avg, node.topright.data]
 
     node.bottomright.data = quadlist[3]
     node.bottomright.rgb_avg = quadlist_averages[3]
     node.bottomright.ID = int(str(node.ID) + str(3))
     print 'New quad created with ID #', node.bottomright.ID
-    quad_rgb_dict[node.bottomright.ID] = node.bottomright.rgb_avg
+    quad_rgb_dict[node.bottomright.ID] = [node.bottomright.rgb_avg, node.bottomright.data]
 
     global num_blocks
     num_blocks += 4
@@ -248,6 +248,25 @@ def quadify_image(node, quad_rgb_dict):
     quadify_image(node.topright, quad_rgb_dict)
     #print 'quad bottomright'
     quadify_image(node.bottomright, quad_rgb_dict)
+
+def calc_offset(key, previous_block):
+  size = previous_block.size
+  ID = key
+  print 'current ID and size of prev block', ID, size
+
+  last2 = ID % 100
+  current_quad = str(last2)[:1]
+  print 'Section to quad:', current_quad
+
+  if current_quad == 0:
+    print 'returning.......'
+    return -size[0], -size[1]
+  elif current_quad == 1:
+    return -size[0], 0
+  elif current_quad == 2:
+    return 0, -size[1]
+  else:
+    return 0,0
   
 ##################
 #main method - construct mosaic from tiles in library
@@ -274,8 +293,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
   blocks_list = []
   #divide source image into blocks
   cropped_image_xy = divide_image_into_blocks(target_image, tile_size, block_rgb_dict, block_hash_dict, blocks_list)
-
-
+  print 'cropped image x y',cropped_image_xy
 
   if quadtree:
     root = Tree()
@@ -296,7 +314,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
     while node_iterator.topleft != None:
       print 'down topleft'
       print node_iterator.topleft.ID
-      node_iterator.topleft.data.show()
+      #node_iterator.topleft.data.show()
       node_parent = node_iterator #save node we were just in for back-travel
       node_iterator = node_iterator.topleft #move one step down into next child
     print 'up'
@@ -305,7 +323,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
     while node_iterator.bottomleft != None:
       print 'down bottomleft'
       print node_iterator.bottomleft.ID
-      node_iterator.bottomleft.data.show()
+      #node_iterator.bottomleft.data.show()
       node_parent = node_iterator #save node we were just in for back-travel
       node_iterator = node_iterator.bottomleft #move one step down into next child
     print 'up'
@@ -314,7 +332,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
     while node_iterator.topright != None:
       print 'down topright'
       print node_iterator.topright.ID
-      node_iterator.topright.data.show()
+      #node_iterator.topright.data.show()
       node_parent = node_iterator #save node we were just in for back-travel
       node_iterator = node_iterator.topright #move one step down into next child
     print 'up'
@@ -323,12 +341,11 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
     while node_iterator.bottomright != None:
       print 'down bottomright'
       print node_iterator.bottomright.ID
-      node_iterator.bottomright.data.show()
+      #node_iterator.bottomright.data.show()
       node_parent = node_iterator #save node we were just in for back-travel
       node_iterator = node_iterator.bottomright #move one step down into next child
     print 'up'
     node_iterator = node_parent
-
 
 
   #create base mosaic image of default dimensions
@@ -338,58 +355,123 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
   y_offset = 0
   num_tiles_placed = 0
   progress_percentage = 0
+
+  current_depth = 1 #tracks which layer of depth we are in
+  previous_block = None #stores image
   
   #db_tiles_rgb_values = []
 
   block_list_counter = 0
   print 'Creating mosaic...'
-  for i in range(0, len(block_rgb_dict.keys()), 1):
-    #find closest colour tiles in library to this specific block
-    closest_rgb_matches = closest_tile(tile_rgb_averages, block_rgb_dict.values()[i], vary_tiles)
 
-    #perform wavelet analysis on the matches to pick the best
-    closest_hashes = {}
-    for rgb in closest_rgb_matches:
-      closest_hashes[calc_image_hash(tile_rgb_averages[rgb])] = rgb
-    hash_diffs = {}
-    for h in closest_hashes.keys():
-      hash_diffs[h - block_hash_dict.values()[i]] = h
+  if quadtree:
+    for key in sorted(quad_rgb_dict.keys()):
+      block_image = quad_rgb_dict.get(key)[1]
+      closest_rgb_matches = closest_tile(tile_rgb_averages, quad_rgb_dict.get(key)[0], vary_tiles)
+      final_rgb = closest_rgb_matches[0] #to be replaced by hashing
+      print '\n', key
+      print 'Size:',block_image.size
 
-    final_hash = hash_diffs[min(hash_diffs)]
-    final_rgb = closest_hashes[final_hash]
-
-    #flag up when there isn't a close tile match, indicating we need a better library image
-    #50 is a magic number, how do we determine where that comes from?
-    if outlier_flagging & (distance(final_rgb, block_rgb_dict.values()[i]) > 50):
-      print 'Distance between block: ', block_rgb_dict.keys()[i], 'and its tile is greater than 50'
-    else:
       #resize and paste tile into place in output mosaic image
-      if tile_rgb_averages[final_rgb].size != tile_size:
-        tile_rgb_averages[final_rgb] = ImageOps.fit(tile_rgb_averages.get(final_rgb), tile_size, Image.ANTIALIAS)
+      if tile_rgb_averages[final_rgb].size != block_image.size:
+        tile_rgb_averages[final_rgb] = ImageOps.fit(tile_rgb_averages.get(final_rgb), block_image.size, Image.ANTIALIAS)
       
       final_tile = tile_rgb_averages[final_rgb]
-
-      if cheat:
-        block_solid_rgb = Image.new('RGB',final_tile.size,block_rgb_dict.values()[i])
-        mask = Image.new('RGBA',final_tile.size,(0,0,0,95)) #lower is more cheaty
-        final_tile = Image.composite(final_tile,block_solid_rgb,mask).convert('RGB')
-        #final_tile = ImageChops.blend(final_tile, block_solid_rgb, 0.5)
-
+      print 'X:', x_offset, 'Y:', y_offset
       mosaic.paste(final_tile, (x_offset,y_offset))
+      
 
-    #sets the point to place the next tile
-    if y_offset < cropped_image_xy[1]:
-      y_offset += tile_size[1]
-    else:
-      y_offset = 0
-      x_offset += tile_size[0]
+      #sets the point to place the next tile
+      
+      #code for pasting 4 quads      
+      #if len(str(key)) < current_depth + 1:
+      last_digit = key % 10
 
-    num_tiles_placed += 1
-    progress_percentage = num_tiles_placed/float(len(block_rgb_dict.keys())) * 100
-    if progress_percentage % 5 == 0:
-      print "Progress: ", progress_percentage, "%"
+      if last_digit == 0:
+        print 'LAST IS 0'
+        y_offset += block_image.size[1]
+      elif last_digit == 1:
+        print 'LAST IS 1'
+        x_offset += block_image.size[0]
+        y_offset -= block_image.size[1]
+      elif last_digit == 2:
+        print 'LAST IS 2'
+        y_offset += block_image.size[1]
+      else:
+        print 'LAST IS 3'
+        current_depth += 1
+        print 'prev block, ID', previous_block, key
+        x_change, y_change = calc_offset(key, previous_block)
+        y_offset += y_change
+        x_offset += x_change
 
-    block_list_counter += 1
+        #if y_offset < target_image.size[1]:
+          #y_offset += block_image.size[1]
+        #else:
+          #y_offset = 0
+          #x_offset += block_image.size[0]
+      #code for finding where to place first block of new quad area
+      #else:
+        
+
+      print 'X AFTER CHANGE:', x_offset, 'Y AFTER CHANGE:', y_offset
+
+      num_tiles_placed += 1
+      progress_percentage = num_tiles_placed/float(len(block_rgb_dict.keys())) * 100
+      if progress_percentage % 5 == 0:
+        print "Progress: ", progress_percentage, "%"
+
+      block_list_counter += 1
+      previous_block = final_tile
+
+  else:    
+    for i in range(0, len(block_rgb_dict.keys()), 1):
+      #find closest colour tiles in library to this specific block
+      closest_rgb_matches = closest_tile(tile_rgb_averages, block_rgb_dict.values()[i], vary_tiles)
+
+      #perform wavelet analysis on the matches to pick the best
+      closest_hashes = {}
+      for rgb in closest_rgb_matches:
+        closest_hashes[calc_image_hash(tile_rgb_averages[rgb])] = rgb
+      hash_diffs = {}
+      for h in closest_hashes.keys():
+        hash_diffs[h - block_hash_dict.values()[i]] = h
+
+      final_hash = hash_diffs[min(hash_diffs)]
+      final_rgb = closest_hashes[final_hash]
+
+      #flag up when there isn't a close tile match, indicating we need a better library image
+      #50 is a magic number, how do we determine where that comes from?
+      if outlier_flagging & (distance(final_rgb, block_rgb_dict.values()[i]) > 50):
+        print 'Distance between block: ', block_rgb_dict.keys()[i], 'and its tile is greater than 50'
+      else:
+        #resize and paste tile into place in output mosaic image
+        if tile_rgb_averages[final_rgb].size != tile_size:
+          tile_rgb_averages[final_rgb] = ImageOps.fit(tile_rgb_averages.get(final_rgb), tile_size, Image.ANTIALIAS)
+        
+        final_tile = tile_rgb_averages[final_rgb]
+
+        if cheat:
+          block_solid_rgb = Image.new('RGB',final_tile.size,block_rgb_dict.values()[i])
+          mask = Image.new('RGBA',final_tile.size,(0,0,0,95)) #lower is more cheaty
+          final_tile = Image.composite(final_tile,block_solid_rgb,mask).convert('RGB')
+          #final_tile = ImageChops.blend(final_tile, block_solid_rgb, 0.5)
+
+        mosaic.paste(final_tile, (x_offset,y_offset))
+
+      #sets the point to place the next tile
+      if y_offset < cropped_image_xy[1]:
+        y_offset += tile_size[1]
+      else:
+        y_offset = 0
+        x_offset += tile_size[0]
+
+      num_tiles_placed += 1
+      progress_percentage = num_tiles_placed/float(len(block_rgb_dict.keys())) * 100
+      if progress_percentage % 5 == 0:
+        print "Progress: ", progress_percentage, "%"
+
+      block_list_counter += 1
 
   #mosaic = mosaic.filter(ImageFilter.MedianFilter)
 
@@ -404,5 +486,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
   end = time.time()
   print 'Time elapsed: ', end - start
 
+#put tile offsetting before pasting so we can check which section we are in for small quads
+#this system may not work if there are more than 1 places where we quad eg. ID: 300 but also 200
 #fix recursive showing of images, not handling divisions well (not really necessary tbh, more for debugging)
-#change x/y_offset system to account for tile size
+#add hashing of quads + cheating
