@@ -13,8 +13,9 @@ class Tree(object):
         self.data = None
         self.rgb_avg = None
         self.ID = 0
+        self.coords = 0,0
 
-variance_threshold = 1300
+variance_threshold = 600
 num_blocks = 0
 
 ##################
@@ -142,23 +143,26 @@ def fill_tile_library(tile_dict):
 def divide_image_into_quads(image):
   width, height = image.size
   quadlist = []
+  coords = []
 
   if width > 1 and height > 1:
     for i in range(0, width, (width+1)/2):
       for j in range(0, height, (height+1)/2):
+        print 'Coords:', i, j
         cropped_image = image.crop((i, j, i+(width+1)/2, j+(height+1)/2))
         quadlist.append(cropped_image)
+        coords.append((i,j))
   else:
     print 'Error: Image is size of 1 pixel'
 
-  return quadlist
+  return quadlist, coords
 
 ##################
 #calculates colour variance between 4 image quads
 ##################
 def calculate_variance(node, quad_rgb_dict):
   #divide image into quads
-  quadlist = divide_image_into_quads(node.data)
+  quadlist, coords = divide_image_into_quads(node.data)
   quadlist_averages = []
 
   #get average rgb for each quad (for variance calculation) & put blocks into dict
@@ -185,19 +189,17 @@ def calculate_variance(node, quad_rgb_dict):
 
   #calculate variance for image
   variance = sum(distances_squared) / len(distances_squared)
-  return variance, quadlist, quadlist_averages, num_blocks
+  return variance, quadlist, quadlist_averages, num_blocks, coords
 
 ##################
 #recursively divides images into quads based on their colour variance
 ##################
 def quadify_image(node, quad_rgb_dict):  
-  variance, quadlist, quadlist_averages, num_blocks = calculate_variance(node, quad_rgb_dict)
-  #print 'Variance: ', variance, '\n', node.data
-  #print 'num_blocks: ', num_blocks
+  variance, quadlist, quadlist_averages, num_blocks, coords = calculate_variance(node, quad_rgb_dict)
 
   #if variance is above threshold, quadify again
-  #print node.data.size, '\n'
-  if variance > variance_threshold and node.data.size > (4,4):
+  print 'ID:', node.ID, 'variance:', variance
+  if variance > variance_threshold and node.data.size > (10,10):
     #node.data.show()
 
     node.topleft = Tree()
@@ -206,32 +208,37 @@ def quadify_image(node, quad_rgb_dict):
     node.bottomright = Tree()
 
     #put the image/rgb average/ID data into the new wuad children
-    #ID: 0,1,2,3 represent tl,bl,tr,bl respectively
+    #ID: 1,2,3,4 represent tl,bl,tr,bl respectively
     #extra digits mean an extra division eg. 30 is top right quad of bottom right quad
     node.topleft.data = quadlist[0]
     node.topleft.rgb_avg = quadlist_averages[0]
-    node.topleft.ID = int(str(node.ID) + str(0))    
+    print 'Node ID, added num:', str(node.ID), str(1)
+    node.topleft.ID = int(str(node.ID) + str(1))    
+    node.topleft.coords = tuple(map(sum,zip(node.coords,coords[0])))
     print 'New quad created with ID #', node.topleft.ID
     #put rgb average data into the quad/block dict
-    quad_rgb_dict[node.topleft.ID] = [node.topleft.rgb_avg, node.topleft.data]
+    quad_rgb_dict[node.topleft.ID] = [node.topleft.rgb_avg, node.topleft.data, node.topleft.coords]
 
     node.bottomleft.data = quadlist[1]
     node.bottomleft.rgb_avg = quadlist_averages[1]
-    node.bottomleft.ID = int(str(node.ID) + str(1))
+    node.bottomleft.ID = int(str(node.ID) + str(2))
+    node.bottomleft.coords = tuple(map(sum,zip(node.coords,coords[1])))
     print 'New quad created with ID #', node.bottomleft.ID
-    quad_rgb_dict[node.bottomleft.ID] = [node.bottomleft.rgb_avg, node.bottomleft.data]
+    quad_rgb_dict[node.bottomleft.ID] = [node.bottomleft.rgb_avg, node.bottomleft.data, node.bottomleft.coords]
 
     node.topright.data = quadlist[2]
     node.topright.rgb_avg = quadlist_averages[2]
-    node.topright.ID = int(str(node.ID) + str(2))
+    node.topright.ID = int(str(node.ID) + str(3))
+    node.topright.coords = tuple(map(sum,zip(node.coords,coords[2])))
     print 'New quad created with ID #', node.topright.ID
-    quad_rgb_dict[node.topright.ID] = [node.topright.rgb_avg, node.topright.data]
+    quad_rgb_dict[node.topright.ID] = [node.topright.rgb_avg, node.topright.data, node.topright.coords]
 
     node.bottomright.data = quadlist[3]
     node.bottomright.rgb_avg = quadlist_averages[3]
-    node.bottomright.ID = int(str(node.ID) + str(3))
+    node.bottomright.ID = int(str(node.ID) + str(4))
+    node.bottomright.coords = tuple(map(sum,zip(node.coords,coords[3])))
     print 'New quad created with ID #', node.bottomright.ID
-    quad_rgb_dict[node.bottomright.ID] = [node.bottomright.rgb_avg, node.bottomright.data]
+    quad_rgb_dict[node.bottomright.ID] = [node.bottomright.rgb_avg, node.bottomright.data, node.bottomright.coords]
 
     global num_blocks
     num_blocks += 4
@@ -256,14 +263,14 @@ def calc_offset(key, previous_block):
 
   last2 = ID % 100
   current_quad = str(last2)[:1]
-  print 'Section to quad:', current_quad
+  print 'Section to quad:', int(current_quad)
 
-  if current_quad == 0:
-    print 'returning.......'
+  if int(current_quad) == 0:
+    print 'returning.......', -size[0], -size[1]
     return -size[0], -size[1]
-  elif current_quad == 1:
+  elif int(current_quad) == 1:
     return -size[0], 0
-  elif current_quad == 2:
+  elif int(current_quad) == 2:
     return 0, -size[1]
   else:
     return 0,0
@@ -300,13 +307,16 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
     root.data = target_image
     root.ID = 0
 
-    #Key = quad/bock ID, Value = RGB avg
+    #Key = quad/block ID, Value = RGB avg, Image, Coord
     quad_rgb_dict = {}
 
     quadify_image(root, quad_rgb_dict)
     
-    print 'There are', num_blocks, 'blocks:'
-    print quad_rgb_dict, '\n'
+    if num_blocks < 4:
+      print 'Threshold is too high'
+
+    print 'There are', num_blocks, 'blocks'
+    #print quad_rgb_dict, '\n'
 
     node_iterator = root
     node_parent = None
@@ -356,7 +366,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
   num_tiles_placed = 0
   progress_percentage = 0
 
-  current_depth = 1 #tracks which layer of depth we are in
+  #current_depth = 1 #tracks which layer of depth we are in
   previous_block = None #stores image
   
   #db_tiles_rgb_values = []
@@ -365,6 +375,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
   print 'Creating mosaic...'
 
   if quadtree:
+    print sorted(quad_rgb_dict.keys())
     for key in sorted(quad_rgb_dict.keys()):
       block_image = quad_rgb_dict.get(key)[1]
       closest_rgb_matches = closest_tile(tile_rgb_averages, quad_rgb_dict.get(key)[0], vary_tiles)
@@ -377,33 +388,64 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
         tile_rgb_averages[final_rgb] = ImageOps.fit(tile_rgb_averages.get(final_rgb), block_image.size, Image.ANTIALIAS)
       
       final_tile = tile_rgb_averages[final_rgb]
+
+
+      digits = [int(d) for d in str(key)]
+      print digits
+
+      x_offset, y_offset = quad_rgb_dict.get(key)[2]
+      print 'Offsets:', x_offset, y_offset
+
+      #x_offset = 0
+      #y_offset = 0
+      #current_depth = 1
+      #print 'Depth:', current_depth
+      #for digit in digits:
+      #  if digit == 1:
+      #    y_offset += int(target_image.size[1] * math.pow(0.5, current_depth))
+      #  if digit == 2:
+      #    x_offset += int(target_image.size[0] * math.pow(0.5, current_depth))
+      #  if digit == 3:
+      #    x_offset += int(target_image.size[0] * math.pow(0.5, current_depth))
+      #    y_offset += int(target_image.size[1] * math.pow(0.5, current_depth))
+      #  else:
+      #    print 'no change to offset'
+      #
+      #  current_depth += 1
+      #print x_offset, y_offset
+      #print 'Current depth:', current_depth
+      #if len(str(key)) < current_depth + 1:
+      #  last_digit = key % 10
+      #  if last_digit == 0:
+      #    print 'Parent Zone 0'
+      #  elif last_digit == 1:
+      #    print 'Parent Zone 1'
+      #    y_offset += block_image.size[1]
+      #  elif last_digit == 2:
+      #    print 'Parent Zone 2'
+      #    x_offset += block_image.size[0]
+      #    y_offset -= block_image.size[1]
+      #  else:
+      #    print 'Parent Zone 3'          
+      #    y_offset += block_image.size[1]
+      #else:
+      #  print 'prev block, ID', previous_block, key
+      #  x_change, y_change = calc_offset(key, previous_block)
+      #  print 'x_change, y_change:', x_change, y_change
+      #  y_offset += y_change
+      #  x_offset += x_change
+      #  current_depth += 1   
+
       print 'X:', x_offset, 'Y:', y_offset
-      mosaic.paste(final_tile, (x_offset,y_offset))
       
+      mosaic.paste(final_tile, (x_offset,y_offset))
+
 
       #sets the point to place the next tile
       
       #code for pasting 4 quads      
       #if len(str(key)) < current_depth + 1:
-      last_digit = key % 10
-
-      if last_digit == 0:
-        print 'LAST IS 0'
-        y_offset += block_image.size[1]
-      elif last_digit == 1:
-        print 'LAST IS 1'
-        x_offset += block_image.size[0]
-        y_offset -= block_image.size[1]
-      elif last_digit == 2:
-        print 'LAST IS 2'
-        y_offset += block_image.size[1]
-      else:
-        print 'LAST IS 3'
-        current_depth += 1
-        print 'prev block, ID', previous_block, key
-        x_change, y_change = calc_offset(key, previous_block)
-        y_offset += y_change
-        x_offset += x_change
+      
 
         #if y_offset < target_image.size[1]:
           #y_offset += block_image.size[1]
@@ -414,7 +456,7 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
       #else:
         
 
-      print 'X AFTER CHANGE:', x_offset, 'Y AFTER CHANGE:', y_offset
+      #print 'X AFTER CHANGE:', x_offset, 'Y AFTER CHANGE:', y_offset
 
       num_tiles_placed += 1
       progress_percentage = num_tiles_placed/float(len(block_rgb_dict.keys())) * 100
@@ -422,7 +464,9 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
         print "Progress: ", progress_percentage, "%"
 
       block_list_counter += 1
-      previous_block = final_tile
+      previous_block = final_tile #use to get size of prev block for offsetting
+
+    print sorted(quad_rgb_dict.keys())
 
   else:    
     for i in range(0, len(block_rgb_dict.keys()), 1):
@@ -486,7 +530,6 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
   end = time.time()
   print 'Time elapsed: ', end - start
 
-#put tile offsetting before pasting so we can check which section we are in for small quads
-#this system may not work if there are more than 1 places where we quad eg. ID: 300 but also 200
-#fix recursive showing of images, not handling divisions well (not really necessary tbh, more for debugging)
+#remove all unecessary code
 #add hashing of quads + cheating
+#fix recursive showing of images, not handling divisions well (not really necessary tbh, more for debugging)
