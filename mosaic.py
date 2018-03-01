@@ -250,8 +250,13 @@ def quadify_image(node, quad_rgb_dict):
 ##################
 #main method - construct mosaic from tiles in library
 ##################
-def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, cheat, super_cheat, quadtree):
+def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, cheat, super_cheat):
   start = time.time()
+
+  quadtree = False
+  if input_tile_size == 0:
+    quadtree = True
+    print 'Quadtree tiling is on'
 
   target_image = Image.open(source_image)
   tile_size = input_tile_size, input_tile_size
@@ -261,44 +266,34 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
   tile_rgb_averages = {}
   fill_tile_library(tile_rgb_averages)  
 
-  #Key = Coordinate in Source, Value = RGB
-  block_rgb_dict = {}
-  #Key = Coordinate in Source, Value = hash
-  block_hash_dict = {}
-
-  #divide source image into blocks
-  cropped_image_xy = divide_image_into_blocks(target_image, tile_size, block_rgb_dict, block_hash_dict)
-
-  if quadtree:
-    root = Tree()
-    root.data = target_image
-    root.ID = 0
-
-    #Key = quad/block ID, Value = RGB avg, Image, Coord
-    quad_rgb_dict = {}
-
-    quadify_image(root, quad_rgb_dict)
-    
-    if num_blocks < 4:
-      print 'Threshold is too high'
-
-    print 'There are', num_blocks, 'blocks'
-
   #create base mosaic image of default dimensions
   mosaic = Image.new('RGB', (target_image.size[0], target_image.size[1]), color=(255, 0, 255))
 
   x_offset = 0
   y_offset = 0
   num_tiles_placed = 0
-  progress_percentage = 0
-
-  #stores parent quad
-  previous_block = None 
+  progress_percentage = 0   
   
-  block_list_counter = 0
   print 'Creating mosaic...'
 
   if quadtree:
+    #initial base image
+    root = Tree()
+    root.data = target_image
+    root.ID = 0
+
+    #stores parent quad
+    previous_block = None
+
+    #Key = quad/block ID, Value = RGB avg, Image, Coord
+    quad_rgb_dict = {}
+    #recursively divide image into quads based on colour variance
+    quadify_image(root, quad_rgb_dict)
+    
+    if num_blocks < 4:
+      print 'Threshold is too high'
+    print 'There are', num_blocks, 'blocks'
+
     #print sorted(quad_rgb_dict.keys())
     for key in sorted(quad_rgb_dict.keys()):
       block_image = quad_rgb_dict.get(key)[1]
@@ -314,20 +309,28 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
       x_offset, y_offset = quad_rgb_dict.get(key)[2]
       #print 'X:', x_offset, 'Y:', y_offset
 
+      #paste replacement tile into place
       final_tile = tile_rgb_averages[final_rgb]
       mosaic.paste(final_tile, (x_offset,y_offset))
 
+      #progress marker
       num_tiles_placed += 1
       progress_percentage = num_tiles_placed/float(len(quad_rgb_dict.keys())) * 100
       if progress_percentage % 5 == 0:
         print "Progress: ", progress_percentage, "%"
 
-      block_list_counter += 1
-
       #used to get size of prev block for offsetting
       previous_block = final_tile 
 
-  else:    
+  else:
+    #Key = Coordinate in Source, Value = RGB
+    block_rgb_dict = {}
+    #Key = Coordinate in Source, Value = hash
+    block_hash_dict = {}
+
+    #divide source image into blocks
+    cropped_image_xy = divide_image_into_blocks(target_image, tile_size, block_rgb_dict, block_hash_dict)
+
     for i in range(0, len(block_rgb_dict.keys()), 1):
       #find closest colour tiles in library to this specific block
       closest_rgb_matches = closest_tile(tile_rgb_averages, block_rgb_dict.values()[i], vary_tiles)
@@ -374,8 +377,6 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
       if progress_percentage % 5 == 0:
         print "Progress: ", progress_percentage, "%"
 
-      block_list_counter += 1
-
   #mosaic = mosaic.filter(ImageFilter.MedianFilter)
 
   if super_cheat:
@@ -389,7 +390,5 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
   end = time.time()
   print 'Time elapsed: ', end - start
 
-#remove all unecessary code
 #add hashing of quads + cheating
 #threshold must be very different for different images
-#fix recursive showing of images, not handling divisions well (not really necessary tbh, more for debugging)

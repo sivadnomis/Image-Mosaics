@@ -17,8 +17,9 @@ Main script as command line tool:
 
   input        Source image file
   tile_size    Pixel height and width of each tile
+               --If tilesize is 0, program uses Quadtree division instead of regular sized tiles
 
-  Optional arguments (don't work together):
+  Optional arguments (only usable independently):
 
   [flag]       Highlights blocks in the output mosaic without a close colour match in the library
   [vary]       Selects randomly from the 2 closest tile matches rather than the closest
