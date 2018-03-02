@@ -162,7 +162,7 @@ def divide_image_into_quads(image):
 ##################
 #calculates colour variance between 4 image quads
 ##################
-def calculate_variance(node, quad_rgb_dict):
+def calculate_variance(node):
   #divide image into quads
   quadlist, coords = divide_image_into_quads(node.data)
   quadlist_averages = []
@@ -196,8 +196,8 @@ def calculate_variance(node, quad_rgb_dict):
 ##################
 #recursively divides images into quads based on their colour variance
 ##################
-def quadify_image(node, quad_rgb_dict):  
-  variance, quadlist, quadlist_averages, num_blocks, coords = calculate_variance(node, quad_rgb_dict)
+def quadify_image(node, quad_rgb_dict, quad_hash_dict):  
+  variance, quadlist, quadlist_averages, num_blocks, coords = calculate_variance(node)
 
   #if variance is above threshold, quadify again
   #print 'ID:', node.ID, 'variance:', variance
@@ -217,6 +217,7 @@ def quadify_image(node, quad_rgb_dict):
     #print 'New quad created with ID #', node.topleft.ID
     #put rgb average data into the quad/block dict
     quad_rgb_dict[node.topleft.ID] = [node.topleft.rgb_avg, node.topleft.data, node.topleft.coords]
+    quad_hash_dict[node.topleft.ID] = calc_image_hash(node.topleft.data)
 
     node.bottomleft.data = quadlist[1]
     node.bottomleft.rgb_avg = quadlist_averages[1]
@@ -224,6 +225,7 @@ def quadify_image(node, quad_rgb_dict):
     node.bottomleft.coords = tuple(map(sum,zip(node.coords,coords[1])))
     #print 'New quad created with ID #', node.bottomleft.ID
     quad_rgb_dict[node.bottomleft.ID] = [node.bottomleft.rgb_avg, node.bottomleft.data, node.bottomleft.coords]
+    quad_hash_dict[node.bottomleft.ID] = calc_image_hash(node.bottomleft.data)
 
     node.topright.data = quadlist[2]
     node.topright.rgb_avg = quadlist_averages[2]
@@ -231,6 +233,7 @@ def quadify_image(node, quad_rgb_dict):
     node.topright.coords = tuple(map(sum,zip(node.coords,coords[2])))
     #print 'New quad created with ID #', node.topright.ID
     quad_rgb_dict[node.topright.ID] = [node.topright.rgb_avg, node.topright.data, node.topright.coords]
+    quad_hash_dict[node.topright.ID] = calc_image_hash(node.topright.data)
 
     node.bottomright.data = quadlist[3]
     node.bottomright.rgb_avg = quadlist_averages[3]
@@ -238,14 +241,15 @@ def quadify_image(node, quad_rgb_dict):
     node.bottomright.coords = tuple(map(sum,zip(node.coords,coords[3])))
     #print 'New quad created with ID #', node.bottomright.ID
     quad_rgb_dict[node.bottomright.ID] = [node.bottomright.rgb_avg, node.bottomright.data, node.bottomright.coords]
+    quad_hash_dict[node.bottomright.ID] = calc_image_hash(node.bottomright.data)
 
     global num_blocks
     num_blocks += 4
 
-    quadify_image(node.topleft, quad_rgb_dict)
-    quadify_image(node.bottomleft, quad_rgb_dict)
-    quadify_image(node.topright, quad_rgb_dict)
-    quadify_image(node.bottomright, quad_rgb_dict)
+    quadify_image(node.topleft, quad_rgb_dict, quad_hash_dict)
+    quadify_image(node.bottomleft, quad_rgb_dict, quad_hash_dict)
+    quadify_image(node.topright, quad_rgb_dict, quad_hash_dict)
+    quadify_image(node.bottomright, quad_rgb_dict, quad_hash_dict)
   
 ##################
 #main method - construct mosaic from tiles in library
@@ -287,8 +291,11 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
 
     #Key = quad/block ID, Value = RGB avg, Image, Coord
     quad_rgb_dict = {}
+    #Key = quad/block ID, Value = hash
+    quad_hash_dict = {}
+
     #recursively divide image into quads based on colour variance
-    quadify_image(root, quad_rgb_dict)
+    quadify_image(root, quad_rgb_dict, quad_hash_dict)
     
     if num_blocks < 4:
       print 'Threshold is too high'
@@ -298,7 +305,18 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
     for key in sorted(quad_rgb_dict.keys()):
       block_image = quad_rgb_dict.get(key)[1]
       closest_rgb_matches = closest_tile(tile_rgb_averages, quad_rgb_dict.get(key)[0], vary_tiles)
-      final_rgb = closest_rgb_matches[0] #TODO replace with hashing
+      
+      #perform wavelet analysis on the matches to pick the best
+      closest_hashes = {}
+      for rgb in closest_rgb_matches:
+        closest_hashes[calc_image_hash(tile_rgb_averages[rgb])] = rgb
+      hash_diffs = {}
+      for h in closest_hashes.keys():
+        hash_diffs[h - quad_hash_dict.get(key)] = h
+
+      final_hash = hash_diffs[min(hash_diffs)]
+      final_rgb = closest_hashes[final_hash]
+
       #print '\n', key
       #print 'Size:',block_image.size
 
