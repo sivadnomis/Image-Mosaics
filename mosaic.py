@@ -329,6 +329,12 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
 
       #paste replacement tile into place
       final_tile = tile_rgb_averages[final_rgb]
+
+      if cheat:
+        quad_solid_rgb = Image.new('RGB',final_tile.size,quad_rgb_dict.get(key)[0])
+        mask = Image.new('RGBA',final_tile.size,(0,0,0,95)) #lower is more cheaty
+        final_tile = Image.composite(final_tile,quad_solid_rgb,mask).convert('RGB')
+
       mosaic.paste(final_tile, (x_offset,y_offset))
 
       #progress marker
@@ -408,5 +414,5 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
   end = time.time()
   print 'Time elapsed: ', end - start
 
-#add hashing of quads + cheating
+#add cheating
 #threshold must be very different for different images
