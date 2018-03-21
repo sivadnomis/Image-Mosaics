@@ -59,4 +59,4 @@ Notes:
   
   * To use a different image library, simply rename/replace the 'library' folder with a different folder.
 
-  * Output size is currently fixed at 500,500 but the program works at higher resolutions too.
+  * Output size is currently fixed at a maximum of 3000px,3000px

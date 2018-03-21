@@ -13,3 +13,8 @@ testlib results/
 cv2/
 numpy-1.14.0/
 library/
+google-images-download-master/
+library variances
+librarytest/
+test results/
+modify_image.py

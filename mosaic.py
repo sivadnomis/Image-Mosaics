@@ -15,7 +15,7 @@ class Tree(object):
         self.ID = 0
         self.coords = 0,0
 
-variance_threshold = 400
+variance_threshold = 1000
 num_blocks = 0
 
 ##################
@@ -167,30 +167,48 @@ def calculate_variance(node):
   quadlist, coords = divide_image_into_quads(node.data)
   quadlist_averages = []
 
+  quadquadlist = []
+  quadquadlist_averages = []
+  new_coords = []
+
+  for q in quadlist:
+    tempquad, tempcoords = divide_image_into_quads(q)
+    quadquadlist.append(tempquad)
+    new_coords.append(tempcoords)
+  #for x in quadquadlist:
+    #print x
   #get average rgb for each quad (for variance calculation) & put blocks into dict
   for i in quadlist:
     average_rgb = calc_average_rgb(i, True)
     quadlist_averages.append(average_rgb)
 
+  for j in quadquadlist:
+    for k in j:
+      average_rgb = calc_average_rgb(k, True)
+      #print average_rgb
+      quadquadlist_averages.append(average_rgb)
+
+ # print quadquadlist_averages
   #get mean rgb for all 4 quads
-  RValues = [x[0] for x in quadlist_averages]
-  GValues = [x[1] for x in quadlist_averages]
-  BValues = [x[2] for x in quadlist_averages]
+  RValues = [x[0] for x in quadquadlist_averages]
+  GValues = [x[1] for x in quadquadlist_averages]
+  BValues = [x[2] for x in quadquadlist_averages]
 
   average_quad_rgb_value = ( sum(RValues)/len(RValues), sum(GValues)/len(GValues), sum(BValues)/len(BValues) )
 
   #get distances from quad averages to overall mean
-  quadlist_distances = []
-  for x in quadlist_averages:
-    quadlist_distances.append(distance(x, average_quad_rgb_value))
+  quadquadlist_distances = []
+  for x in quadquadlist_averages:
+    quadquadlist_distances.append(distance(x, average_quad_rgb_value))
 
   #square distances
   distances_squared = []
-  for y in quadlist_distances:
+  for y in quadquadlist_distances:
     distances_squared.append(y**2)
 
   #calculate variance for image
   variance = sum(distances_squared) / len(distances_squared)
+  #print 'distsum, distlen, Var', sum(distances_squared), len(distances_squared), variance
   return variance, quadlist, quadlist_averages, num_blocks, coords
 
 ##################
@@ -199,6 +217,12 @@ def calculate_variance(node):
 def quadify_image(node, quad_rgb_dict, quad_hash_dict):  
   variance, quadlist, quadlist_averages, num_blocks, coords = calculate_variance(node)
 
+  if num_blocks < 4:
+    print 'Initial var:', variance
+    if variance < 2500:
+      global variance_threshold
+      variance_threshold /= 2
+      print 'var thresh', variance_threshold
   #if variance is above threshold, quadify again
   #print 'ID:', node.ID, 'variance:', variance
   if variance > variance_threshold and node.data.size > (10,10):
@@ -414,5 +438,6 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
   end = time.time()
   print 'Time elapsed: ', end - start
 
-#add cheating
-#threshold must be very different for different images
+
+#work out what is causing grid lines on quadtree method
+#try calculating literal image variance (will probably take too long)
