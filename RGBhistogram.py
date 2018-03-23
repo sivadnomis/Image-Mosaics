@@ -42,7 +42,6 @@ def calculate_variance(library):
 
 def generate_RGB_buckets(image):
   image = ImageOps.fit(image, (50,50), Image.ANTIALIAS)
-  #image.show()
 
   PixelValues = list(image.getdata())
 

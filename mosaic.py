@@ -21,12 +21,37 @@ num_blocks = 0
 ##################
 #open source image
 ##################
-def resize_source_image( image ):  
-  #default dimensions to resize source image to
+def resize_source_image(image, quadtree):  
+  #hard coded max dimensions to resize source image to
   source_size = 3000,3000
   image.thumbnail(source_size, Image.ANTIALIAS)
+  new_x = image.size[0]
+  new_y = image.size[1]
+
+  if quadtree:
+    #we must crop to a power of 64 so we can guarantee 6 levels of smooth quad divisions
+    powers_of_64 = []
+    base = 64
+    for i in range(1,47): #47 * 16 is the closest number to 3000, our max size
+      powers_of_64.append(base * i)
+
+    new_x = min(powers_of_64, key=lambda x:abs(x-image.size[0]))
+    #make sure the new x isn't larger than the original
+    if new_x > image.size[0]:
+      powers_of_64.remove(new_x)
+      new_x = min(powers_of_64, key=lambda x:abs(x-image.size[0]))
+
+    new_y = min(powers_of_64, key=lambda y:abs(y-image.size[1]))
+    if new_y > image.size[1]:
+      powers_of_64.remove(new_y)
+      new_y = min(powers_of_64, key=lambda y:abs(y-image.size[1]))
+
+    print 'Output mosaic size:', new_x, new_y
+
+    image = image.crop((0,0,new_x,new_y))
+
   image.show()
-  return image
+  return image, new_x, new_y
 
 ##################
 #open tile images in library
@@ -120,9 +145,10 @@ def fill_tile_library(tile_dict):
   db.commit()
   db.close()
 
-  R_overflow = 256
-  G_overflow = 256
-  B_overflow = 256
+  #potential solution to images off same rgb
+  #R_overflow = 256
+  #G_overflow = 256
+  #B_overflow = 256
 
   #put tile images from database into our rgb/image dictionary
   print 'Gathering image tiles from library...'
@@ -134,9 +160,9 @@ def fill_tile_library(tile_dict):
       #tile_dict[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])].show()
       #t.show()
       #tile_dict[(R_overflow, G_overflow, B_overflow)] = t
-      R_overflow+=1
-      G_overflow+=1
-      B_overflow+=1
+      #R_overflow+=1
+      #G_overflow+=1
+      #B_overflow+=1
     else:
       tile_dict[((db_tiles[i])[1], (db_tiles[i])[2], (db_tiles[i])[3])] = t
 
@@ -167,43 +193,41 @@ def calculate_variance(node):
   quadlist, coords = divide_image_into_quads(node.data)
   quadlist_averages = []
 
-  quadquadlist = []
-  quadquadlist_averages = []
-  new_coords = []
+  sub_quad_list = []
+  sub_quad_list_averages = []
+  #new_coords = []
 
+  #divide quads into 4 further quads each to get a more representative variance over 16 blocks
   for q in quadlist:
-    tempquad, tempcoords = divide_image_into_quads(q)
-    quadquadlist.append(tempquad)
-    new_coords.append(tempcoords)
-  #for x in quadquadlist:
-    #print x
+    sub_quad, sub_quad_coords = divide_image_into_quads(q)
+    sub_quad_list.append(sub_quad)
+    #new_coords.append(sub_quad_coords)
+
   #get average rgb for each quad (for variance calculation) & put blocks into dict
   for i in quadlist:
     average_rgb = calc_average_rgb(i, True)
     quadlist_averages.append(average_rgb)
 
-  for j in quadquadlist:
+  for j in sub_quad_list:
     for k in j:
       average_rgb = calc_average_rgb(k, True)
-      #print average_rgb
-      quadquadlist_averages.append(average_rgb)
+      sub_quad_list_averages.append(average_rgb)
 
- # print quadquadlist_averages
   #get mean rgb for all 4 quads
-  RValues = [x[0] for x in quadquadlist_averages]
-  GValues = [x[1] for x in quadquadlist_averages]
-  BValues = [x[2] for x in quadquadlist_averages]
+  RValues = [x[0] for x in sub_quad_list_averages]
+  GValues = [x[1] for x in sub_quad_list_averages]
+  BValues = [x[2] for x in sub_quad_list_averages]
 
   average_quad_rgb_value = ( sum(RValues)/len(RValues), sum(GValues)/len(GValues), sum(BValues)/len(BValues) )
 
   #get distances from quad averages to overall mean
-  quadquadlist_distances = []
-  for x in quadquadlist_averages:
-    quadquadlist_distances.append(distance(x, average_quad_rgb_value))
+  sub_quad_list_distances = []
+  for x in sub_quad_list_averages:
+    sub_quad_list_distances.append(distance(x, average_quad_rgb_value))
 
   #square distances
   distances_squared = []
-  for y in quadquadlist_distances:
+  for y in sub_quad_list_distances:
     distances_squared.append(y**2)
 
   #calculate variance for image
@@ -218,11 +242,12 @@ def quadify_image(node, quad_rgb_dict, quad_hash_dict):
   variance, quadlist, quadlist_averages, num_blocks, coords = calculate_variance(node)
 
   if num_blocks < 4:
-    print 'Initial var:', variance
+    print 'Initial variance:', variance
+    #if the initial variance is below this value we need to allow more subtle differences
     if variance < 2500:
       global variance_threshold
       variance_threshold /= 2
-      print 'var thresh', variance_threshold
+      print 'Reduced variance threshold to', variance_threshold
   #if variance is above threshold, quadify again
   #print 'ID:', node.ID, 'variance:', variance
   if variance > variance_threshold and node.data.size > (10,10):
@@ -238,7 +263,6 @@ def quadify_image(node, quad_rgb_dict, quad_hash_dict):
     node.topleft.rgb_avg = quadlist_averages[0]
     node.topleft.ID = int(str(node.ID) + str(1))    
     node.topleft.coords = tuple(map(sum,zip(node.coords,coords[0])))
-    #print 'New quad created with ID #', node.topleft.ID
     #put rgb average data into the quad/block dict
     quad_rgb_dict[node.topleft.ID] = [node.topleft.rgb_avg, node.topleft.data, node.topleft.coords]
     quad_hash_dict[node.topleft.ID] = calc_image_hash(node.topleft.data)
@@ -247,7 +271,6 @@ def quadify_image(node, quad_rgb_dict, quad_hash_dict):
     node.bottomleft.rgb_avg = quadlist_averages[1]
     node.bottomleft.ID = int(str(node.ID) + str(2))
     node.bottomleft.coords = tuple(map(sum,zip(node.coords,coords[1])))
-    #print 'New quad created with ID #', node.bottomleft.ID
     quad_rgb_dict[node.bottomleft.ID] = [node.bottomleft.rgb_avg, node.bottomleft.data, node.bottomleft.coords]
     quad_hash_dict[node.bottomleft.ID] = calc_image_hash(node.bottomleft.data)
 
@@ -255,7 +278,6 @@ def quadify_image(node, quad_rgb_dict, quad_hash_dict):
     node.topright.rgb_avg = quadlist_averages[2]
     node.topright.ID = int(str(node.ID) + str(3))
     node.topright.coords = tuple(map(sum,zip(node.coords,coords[2])))
-    #print 'New quad created with ID #', node.topright.ID
     quad_rgb_dict[node.topright.ID] = [node.topright.rgb_avg, node.topright.data, node.topright.coords]
     quad_hash_dict[node.topright.ID] = calc_image_hash(node.topright.data)
 
@@ -263,7 +285,6 @@ def quadify_image(node, quad_rgb_dict, quad_hash_dict):
     node.bottomright.rgb_avg = quadlist_averages[3]
     node.bottomright.ID = int(str(node.ID) + str(4))
     node.bottomright.coords = tuple(map(sum,zip(node.coords,coords[3])))
-    #print 'New quad created with ID #', node.bottomright.ID
     quad_rgb_dict[node.bottomright.ID] = [node.bottomright.rgb_avg, node.bottomright.data, node.bottomright.coords]
     quad_hash_dict[node.bottomright.ID] = calc_image_hash(node.bottomright.data)
 
@@ -288,14 +309,14 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
 
   target_image = Image.open(source_image)
   tile_size = input_tile_size, input_tile_size
-  target_image = resize_source_image(target_image)  
+  target_image, width, height = resize_source_image(target_image, quadtree)  
 
   #Key = RGB, Value = Image
   tile_rgb_averages = {}
   fill_tile_library(tile_rgb_averages)  
 
   #create base mosaic image of default dimensions
-  mosaic = Image.new('RGB', (target_image.size[0], target_image.size[1]), color=(255, 0, 255))
+  mosaic = Image.new('RGB', (width, height), color=(255, 0, 255))
 
   x_offset = 0
   y_offset = 0
@@ -333,7 +354,9 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
       #perform wavelet analysis on the matches to pick the best
       closest_hashes = {}
       for rgb in closest_rgb_matches:
-        closest_hashes[calc_image_hash(tile_rgb_averages[rgb])] = rgb
+        #fitted to block size to get accurate hash
+        fitted_tile = ImageOps.fit(tile_rgb_averages[rgb], block_image.size, Image.ANTIALIAS)
+        closest_hashes[calc_image_hash(fitted_tile)] = rgb
       hash_diffs = {}
       for h in closest_hashes.keys():
         hash_diffs[h - quad_hash_dict.get(key)] = h
@@ -341,15 +364,11 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
       final_hash = hash_diffs[min(hash_diffs)]
       final_rgb = closest_hashes[final_hash]
 
-      #print '\n', key
-      #print 'Size:',block_image.size
-
       #resize and paste tile into place in output mosaic image
       if tile_rgb_averages[final_rgb].size != block_image.size:
         tile_rgb_averages[final_rgb] = ImageOps.fit(tile_rgb_averages.get(final_rgb), block_image.size, Image.ANTIALIAS)
       
       x_offset, y_offset = quad_rgb_dict.get(key)[2]
-      #print 'X:', x_offset, 'Y:', y_offset
 
       #paste replacement tile into place
       final_tile = tile_rgb_averages[final_rgb]
@@ -409,7 +428,6 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
           block_solid_rgb = Image.new('RGB',final_tile.size,block_rgb_dict.values()[i])
           mask = Image.new('RGBA',final_tile.size,(0,0,0,95)) #lower is more cheaty
           final_tile = Image.composite(final_tile,block_solid_rgb,mask).convert('RGB')
-          #final_tile = ImageChops.blend(final_tile, block_solid_rgb, 0.5)
 
         mosaic.paste(final_tile, (x_offset,y_offset))
 
@@ -425,8 +443,6 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
       if progress_percentage % 5 == 0:
         print "Progress: ", progress_percentage, "%"
 
-  #mosaic = mosaic.filter(ImageFilter.MedianFilter)
-
   if super_cheat:
     mask = target_image
     mosaic = ImageChops.blend(mosaic, mask, 0.5)
@@ -439,5 +455,5 @@ def create_mosaic(source_image, input_tile_size, outlier_flagging, vary_tiles, c
   print 'Time elapsed: ', end - start
 
 
-#work out what is causing grid lines on quadtree method
-#try calculating literal image variance (will probably take too long)
+#'share' cropped pixels between all sides, not just bottom/right
+#try on laptop with huge library

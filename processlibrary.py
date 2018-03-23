@@ -8,9 +8,7 @@ db = sqlite3.connect(sqlite_file)
 cursor = db.cursor()
 
 cursor.execute("CREATE TABLE IF NOT EXISTS tiles(file_name TEXT PRIMARY KEY, RValue INT, GValue INT, BValue INT)")
-
 cursor.execute("SELECT * FROM tiles")
-#print cursor.fetchall()
 
 counter = 0
 os.chdir(r'library')

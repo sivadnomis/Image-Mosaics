@@ -17,7 +17,7 @@ Main script as command line tool:
 
   input        Source image file
   tile_size    Pixel height and width of each tile
-               --If tilesize is 0, program uses Quadtree division instead of regular sized tiles
+               If tilesize is 0, program uses Quadtree division instead of regular sized tiles
 
   Optional arguments (only usable independently):
 
@@ -41,16 +41,6 @@ Other scripts:
   Runs SSIM (Structural Similarity Index) test on a source image and its mosaic, returns a decimal score (higher = closer match).
 
 
-  createallmosaics.py
-
-  Creates 4 mosaics for each of my main test images (monkey.jpg, me.jpg, rainbow.jpg) for 4 different sizes (50, 20, 10, 5). Mainly used for cleanup after experimenting with different image techniques.
-
-
-  SSIM_tests.py
-
-  Runs suite of SSIM tests, on the 4 mosaics for each of the main test images.
-
-
   RGBhistogram.py image/library [lib]
 
   Genarates 2 histograms showing the RGB colour distribution of the image/library specified in the argument. Use 'lib' flag if argument is a library.
@@ -60,3 +50,5 @@ Notes:
   * To use a different image library, simply rename/replace the 'library' folder with a different folder.
 
   * Output size is currently fixed at a maximum of 3000px,3000px
+
+  * Images will be cropped to multiple of 16 dimensions to ensure evenly sized tiles

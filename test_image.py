@@ -17,5 +17,5 @@ image.save('/home/mbax4sd2/3rd Year Project/' + image_name)
 result = commands.getstatusoutput('compare -metric SSIM ' + mosaic_image + ' ' + image_name + ' output/diff.jpg')
 print result[1]
 
-#command for generating a diff on 2 images. good enough for difference testing?
+#command for generating a SSIM diff on 2 images.
 #compare -metric PSNR mesmall.jpg output/me2mosaic.jpg output/diff.jpg
