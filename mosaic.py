@@ -128,7 +128,7 @@ def closest_tile(tile_rgb_averages, block_rgb_average, vary_tiles):
   if vary_tiles:
     return sorted_rgb_values[randint(0, 1)]
   else:
-    return sorted_rgb_values[:3] #returns 3 closest rgb matches
+    return sorted_rgb_values[:10] #returns 3 closest rgb matches
 
 ##################
 #fills the tile library (dictionary) with the images from the library database 
